@@ -4,6 +4,7 @@ use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use clap::{Parser, Subcommand};
 
 use mana_panel_backend::{
     AppState, api,
@@ -11,6 +12,21 @@ use mana_panel_backend::{
     db,
     services::{docker::DockerService, monitor::SystemMonitor, user::UserService},
 };
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand, Debug)]
+enum Commands {
+    CreateUser {
+        #[arg(short, long)]
+        username: String,
+    },
+}
 
 #[tokio::main]
 async fn main() {
@@ -22,17 +38,46 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
+    // Check for CLI args first
+    let cli = Cli::parse();
+    
+    // Load config and db for all modes
     let config = Config::from_env();
-
-    tracing::info!("Connecting to database...");
-    let db = db::init_database(&config.database_url)
+    let db_conn = db::init_database(&config.database_url)
         .await
         .expect("Failed to initialize database");
-    let db = Arc::new(db);
+    let db = Arc::new(db_conn);
 
-    UserService::init_default_admin(&db)
-        .await
-        .expect("Failed to initialize default admin user");
+    match &cli.command {
+        Some(Commands::CreateUser { username }) => {
+            // Generate random password
+            use rand::Rng;
+            let password: String = rand::thread_rng()
+                .sample_iter(&rand::distributions::Alphanumeric)
+                .take(16)
+                .map(char::from)
+                .collect();
+
+            tracing::info!("Creating user: {}", username);
+            
+            match UserService::create_user(&db, username, &password).await {
+                Ok(_) => {
+                    println!("\nSUCCESS: User created successfully!");
+                    println!("Username: {}", username);
+                    println!("Password: {}", password);
+                    println!("\nPlease save these credentials securely.\n");
+                }
+                Err(e) => {
+                    eprintln!("\nERROR: Failed to create user: {}\n", e);
+                    std::process::exit(1);
+                }
+            }
+            return;
+        }
+        None => {
+            // Normal Server Startup
+        }
+    }
 
     // Initialize system monitor
     let monitor = SystemMonitor::new();

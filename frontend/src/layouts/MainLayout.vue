@@ -2,7 +2,7 @@
     <div class="flex min-h-screen">
         <!-- Sidebar -->
         <aside
-            class="w-64 bg-surface border-r border-border-subtle flex flex-col"
+            class="fixed h-screen w-64 bg-surface border-r border-border-subtle flex flex-col"
         >
             <!-- Logo -->
             <div class="p-6 border-b border-border-subtle">
@@ -209,7 +209,7 @@
         </aside>
 
         <!-- Main Content -->
-        <main class="flex-1 bg-magic overflow-auto">
+        <main class="ml-64 flex-1 bg-magic overflow-auto">
             <RouterView />
         </main>
     </div>

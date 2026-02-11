@@ -117,25 +117,8 @@
                         <span v-else>Sign In</span>
                     </button>
                 </form>
-
-                <!-- Demo Hint -->
-                <p class="mt-6 text-center text-xs text-text-muted">
-                    Demo credentials:
-                    <span class="text-reisa-lilac-400">admin</span> /
-                    <span class="text-reisa-lilac-400">admin</span>
-                </p>
             </div>
-
-            <!-- Footer -->
-            <p class="text-center text-xs text-text-muted mt-6">
-                Powered by
-                <span
-                    class="bg-linear-to-r from-reisa-lilac-400 via-reisa-pink-400 to-reisa-gold-400 bg-clip-text font-medium text-transparent"
-                    >Rust & Vue</span
-                >
-            </p>
         </div>
-        nt-text
     </div>
 </template>
 

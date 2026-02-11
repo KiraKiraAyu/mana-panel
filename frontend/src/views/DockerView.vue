@@ -310,7 +310,7 @@ const removeImage = async (img: ImageInfo) => {
 const createFromImage = (img: ImageInfo) => {
     createDefaultImage.value =
         img.repo_tags.length > 0 && img.repo_tags[0] !== '<none>:<none>'
-            ? img.repo_tags[0]
+            ? img.repo_tags[0]!
             : img.id
     showCreateModal.value = true
 }
