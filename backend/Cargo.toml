@@ -1,0 +1,55 @@
+[package]
+name = "mana-panel-backend"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# Web framework
+axum = { version = "0.8", features = ["ws", "multipart"] }
+axum-extra = { version = "0.10", features = ["typed-header"] }
+tokio = { version = "1", features = ["full"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "fs", "trace"] }
+
+# Database
+sea-orm = { version = "1.1", features = ["sqlx-sqlite", "runtime-tokio-rustls", "macros"] }
+sea-orm-migration = "1.1"
+
+# Authentication
+jsonwebtoken = "9"
+argon2 = { version = "0.5", features = ["std"] }
+rand = "0.8"
+
+# System monitoring
+sysinfo = "0.33"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Async utilities
+tokio-stream = "0.1"
+futures = "0.3"
+
+# Encoding
+base64 = "0.22"
+
+# Docker
+bollard = "0.18"
+
+# Utilities
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+dotenvy = "0.15"
+
+# Terminal PTY (for Linux)
+[target.'cfg(unix)'.dependencies]
+portable-pty = "0.9"

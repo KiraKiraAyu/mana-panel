@@ -1,0 +1,40 @@
+services:
+  backend:
+    build: ./backend
+    container_name: mana-panel-backend
+    restart: unless-stopped
+    environment:
+      - HOST=0.0.0.0
+      - PORT=3000
+      - DATABASE_URL=sqlite:/app/data/mana.db?mode=rwc
+      - JWT_SECRET=${JWT_SECRET:-change-this-in-production}
+      - JWT_EXPIRY_HOURS=${JWT_EXPIRY_HOURS:-24}
+      - RUST_LOG=mana_panel_backend=info
+    volumes:
+      - mana-data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - mana-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/system/info"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build: ./frontend
+    container_name: mana-panel-frontend
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:80"
+    depends_on:
+      - backend
+    networks:
+      - mana-network
+
+volumes:
+  mana-data:
+
+networks:
+  mana-network:
+    driver: bridge
