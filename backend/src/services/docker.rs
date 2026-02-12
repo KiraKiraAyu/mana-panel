@@ -445,6 +445,23 @@ impl DockerService {
         Ok(images.into_iter().map(Self::map_image).collect())
     }
 
+    /// Check whether an image exists locally by tag or id.
+    pub async fn image_exists(&self, image: &str) -> AppResult<bool> {
+        let target = image.trim();
+        if target.is_empty() {
+            return Ok(false);
+        }
+
+        let normalized_target = target.trim_start_matches("sha256:");
+        let images = self.list_images(true).await?;
+
+        Ok(images.iter().any(|img| {
+            img.id == target
+                || img.id.trim_start_matches("sha256:") == normalized_target
+                || img.repo_tags.iter().any(|tag| tag == target)
+        }))
+    }
+
     /// Remove a local image.
     pub async fn remove_image(&self, id: &str, force: bool) -> AppResult<DockerActionResponse> {
         let opts = RemoveImageOptions {
@@ -461,6 +478,49 @@ impl DockerService {
             success: true,
             message: format!("Image {} removed", id),
         })
+    }
+
+    /// Pull an image and stream progress events via channel in real time.
+    pub async fn pull_image_stream(
+        &self,
+        image: &str,
+        tx: tokio::sync::mpsc::Sender<PullProgress>,
+    ) -> AppResult<()> {
+        let (repo, tag) = if let Some(pos) = image.rfind(':') {
+            (&image[..pos], &image[pos + 1..])
+        } else {
+            (image, "latest")
+        };
+
+        let opts = CreateImageOptions {
+            from_image: repo,
+            tag,
+            ..Default::default()
+        };
+
+        let mut stream = self.client.create_image(Some(opts), None, None);
+
+        while let Some(result) = stream.next().await {
+            match result {
+                Ok(info) => {
+                    let item = PullProgress {
+                        status: info.status.unwrap_or_default(),
+                        id: info.id,
+                        progress: info.progress,
+                    };
+
+                    if tx.send(item).await.is_err() {
+                        // Receiver dropped (client disconnected), stop producing events.
+                        break;
+                    }
+                }
+                Err(e) => {
+                    return Err(AppError::System(format!("Docker pull image: {}", e)));
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Pull an image.  Returns collected progress messages.

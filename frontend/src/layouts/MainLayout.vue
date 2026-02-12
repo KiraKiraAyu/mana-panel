@@ -130,6 +130,27 @@
                             d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
                         />
                     </svg>
+                    <!-- Application Icon -->
+                    <svg
+                        v-else-if="item.icon === 'application'"
+                        class="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M3.6 9h16.8M3.6 15h16.8M12 3a15 15 0 010 18M12 3a15 15 0 000 18"
+                        />
+                    </svg>
                     <!-- Terminal Icon -->
                     <svg
                         v-else-if="item.icon === 'terminal'"
@@ -241,6 +262,7 @@ const navItems = [
     { path: '/files', name: 'Files', icon: 'folder' },
     { path: '/services', name: 'Services', icon: 'service' },
     { path: '/docker', name: 'Docker', icon: 'docker' },
+    { path: '/applications', name: 'Application', icon: 'application' },
     { path: '/terminal', name: 'Terminal', icon: 'terminal' },
     { path: '/settings', name: 'Settings', icon: 'settings' },
 ]

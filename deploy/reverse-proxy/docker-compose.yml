@@ -1,0 +1,136 @@
+services:
+    reverse-proxy:
+        image: caddy:2.8-alpine
+        container_name: mana-panel-reverse-proxy
+        restart: unless-stopped
+
+        # Proxy/Caddy runtime tuning via env (consumed by Caddyfile and Go runtime)
+        environment:
+            SITE_ADDRESS: "${SITE_ADDRESS:-0.0.0.0:80}"
+            BACKEND_UPSTREAM: "${BACKEND_UPSTREAM:-mana-panel-backend:3000}"
+            FRONTEND_UPSTREAM: "${FRONTEND_UPSTREAM:-mana-panel-frontend:80}"
+            GOMEMLIMIT: "${CADDY_GOMEMLIMIT:-256MiB}"
+            GOMAXPROCS: "${CADDY_GOMAXPROCS:-0}"
+
+        # Public ingress
+        ports:
+            - "${HTTP_PORT:-80}:80"
+            - "${HTTPS_PORT:-443}:443"
+
+        # If you proxy to services running on the host, this enables host.docker.internal on Linux
+        extra_hosts:
+            - "host.docker.internal:host-gateway"
+
+        # Caddyfile should define the reverse_proxy targets (e.g. mana-panel-backend:3000)
+        volumes:
+            - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+            - caddy_data:/data
+            - caddy_config:/config
+
+        networks:
+            - mana_proxy_net
+
+        depends_on:
+            - mana-panel-backend
+            - mana-panel-frontend
+
+        # Security hardening
+        read_only: true
+        tmpfs:
+            - /tmp
+            - /run
+        cap_drop:
+            - ALL
+        cap_add:
+            - NET_BIND_SERVICE
+        security_opt:
+            - no-new-privileges:true
+
+        # Performance-oriented runtime tuning
+        ulimits:
+            nofile:
+                soft: 65535
+                hard: 65535
+        stop_grace_period: 10s
+
+        # Keep logs bounded to reduce disk I/O pressure
+        logging:
+            driver: local
+            options:
+                max-size: "10m"
+                max-file: "5"
+
+        healthcheck:
+            test:
+                [
+                    "CMD-SHELL",
+                    "wget -q -O - http://127.0.0.1:80/ >/dev/null 2>&1 || exit 1",
+                ]
+            interval: 15s
+            timeout: 3s
+            retries: 5
+            start_period: 15s
+
+    # Optional: run backend in the same stack so proxy can route to it via service name.
+    # You can remove this service if backend is managed elsewhere.
+    mana-panel-backend:
+        build:
+            context: ../../
+            dockerfile: backend/Dockerfile
+        image: mana-panel-backend:local
+        container_name: mana-panel-backend
+        restart: unless-stopped
+        expose:
+            - "3000"
+        environment:
+            HOST: "0.0.0.0"
+            PORT: "3000"
+            DATABASE_URL: "${DATABASE_URL:-sqlite:/app/data/mana-panel.db?mode=rwc}"
+            JWT_SECRET: "${JWT_SECRET:-change-me-in-production}"
+            JWT_EXPIRY_HOURS: "${JWT_EXPIRY_HOURS:-24}"
+        volumes:
+            - mana_panel_data:/app/data
+        networks:
+            - mana_proxy_net
+        healthcheck:
+            test:
+                [
+                    "CMD-SHELL",
+                    "wget -q -O - http://127.0.0.1:3000/api/system/info >/dev/null 2>&1 || exit 1",
+                ]
+            interval: 20s
+            timeout: 3s
+            retries: 5
+            start_period: 20s
+        logging:
+            driver: local
+            options:
+                max-size: "10m"
+                max-file: "5"
+
+    # Optional: frontend container in the same stack, proxied by Caddy.
+    mana-panel-frontend:
+        build:
+            context: ../../frontend
+            dockerfile: Dockerfile
+        image: mana-panel-frontend:local
+        container_name: mana-panel-frontend
+        restart: unless-stopped
+        expose:
+            - "80"
+        networks:
+            - mana_proxy_net
+        logging:
+            driver: local
+            options:
+                max-size: "10m"
+                max-file: "5"
+
+networks:
+    mana_proxy_net:
+        driver: bridge
+
+volumes:
+    caddy_data:
+    caddy_config:
+    mana_panel_data:

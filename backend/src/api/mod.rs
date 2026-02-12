@@ -1,3 +1,4 @@
+pub mod applications;
 pub mod auth;
 pub mod docker;
 pub mod files;
@@ -17,4 +18,5 @@ pub fn create_router() -> Router<crate::AppState> {
         .nest("/services", services::router())
         .nest("/terminal", terminal::router())
         .nest("/docker", docker::router())
+        .nest("/applications", applications::router())
 }

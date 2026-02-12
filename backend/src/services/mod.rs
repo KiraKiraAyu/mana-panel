@@ -1,3 +1,4 @@
+pub mod application;
 pub mod docker;
 pub mod monitor;
 pub mod password;
