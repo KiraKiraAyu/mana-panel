@@ -3,7 +3,6 @@
         class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
         @click.self="$emit('close')"
     >
-        ghost text-xs"
         <div
             class="w-full max-w-lg bg-surface-elevated rounded-xl shadow-2xl animate-in"
         >
@@ -143,7 +142,6 @@
                 </button>
             </div>
         </div>
-        n-primary w-full"
     </div>
 </template>
 

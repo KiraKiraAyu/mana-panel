@@ -6,6 +6,8 @@
         "dev:backend": "sh -c 'if cargo watch --version >/dev/null 2>&1; then cargo watch -x \"run --manifest-path backend/Cargo.toml\" -w backend/src -w backend/Cargo.toml; else echo \"cargo-watch not found, falling back to cargo run\"; cargo run --manifest-path backend/Cargo.toml; fi'",
         "dev:frontend:wait": "sh -c 'until curl -sSf http://127.0.0.1:3000/api/system/info >/dev/null 2>&1; do echo \"waiting backend...\"; sleep 1; done; pnpm --dir frontend run dev'",
         "dev:frontend": "pnpm --dir frontend run dev",
+        "preview": "concurrently --kill-others-on-fail -n backend,frontend -c blue,green \"pnpm run dev:backend\" \"pnpm run preview:frontend:wait\"",
+        "preview:frontend:wait": "sh -c 'until curl -sSf http://127.0.0.1:3000/api/system/info >/dev/null 2>&1; do echo \"waiting backend...\"; sleep 1; done; pnpm --dir frontend run preview'",
         "build": "pnpm run build:backend && pnpm run build:frontend",
         "build:backend": "cargo build --release --manifest-path backend/Cargo.toml",
         "build:frontend": "pnpm --dir frontend run build",
