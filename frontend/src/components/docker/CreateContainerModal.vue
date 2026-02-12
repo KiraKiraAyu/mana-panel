@@ -3,7 +3,6 @@
         class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
         @click.self="$emit('close')"
     >
-        -1 font-mono text-sm" ut">
         <div
             class="w-full max-w-2xl bg-surface-elevated rounded-xl shadow-2xl animate-in max-h-[85vh] overflow-y-auto"
         >
@@ -351,7 +350,6 @@
                     </button>
                 </div>
             </form>
-            n-primary flex-1" n-accent"
         </div>
     </div>
 </template>

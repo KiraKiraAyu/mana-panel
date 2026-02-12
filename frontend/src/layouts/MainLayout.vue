@@ -34,13 +34,17 @@
             </div>
 
             <!-- Navigation -->
-            <nav class="flex-1 p-4 space-y-1">
+            <nav class="flex-1 p-4 relative">
+                <div
+                    class="absolute h-12 inset-0 m-4 rounded-lg bg-linear-to-br from-reisa-lilac-500/20 to-reisa-pink-500/10 z-0 transition-transform duration-300"
+                    :style="{ transform: `translateY(${offset})` }"
+                ></div>
                 <RouterLink
                     v-for="item in navItems"
                     :key="item.path"
                     :to="item.path"
-                    class="nav-item"
-                    :class="{ active: isActive(item.path) }"
+                    class="relative flex items-center h-12 gap-3 z-1 py-3 px-4 text-sm text-text-secondary rounded-lg no-underline bg-clip-text transition-color duration-300 hover:text-text-primary"
+                    :class="{ 'text-reisa-lilac-400': isActive(item.path) }"
                     @pointerdown.left.exact.prevent="
                         navigateImmediate(item.path)
                     "
@@ -240,6 +244,11 @@ const navItems = [
     { path: '/terminal', name: 'Terminal', icon: 'terminal' },
     { path: '/settings', name: 'Settings', icon: 'settings' },
 ]
+
+const offset = computed(() => {
+    const index = navItems.findIndex((element) => isActive(element.path))
+    return `${index * 48}px`
+})
 
 const isActive = (path: string) => {
     if (path === '/') return route.path === '/'
