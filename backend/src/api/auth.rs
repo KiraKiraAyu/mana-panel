@@ -1,14 +1,18 @@
 use axum::{
-    extract::State,
-    routing::{get, post},
     Json, Router,
-    response::{IntoResponse, Response},
-    http::{header, HeaderMap},
+    extract::State,
+    http::{HeaderMap, header},
+    response::IntoResponse,
+    routing::{get, post},
 };
 use axum_extra::extract::cookie::{Cookie, SameSite};
 use serde::{Deserialize, Serialize};
 
-use crate::{error::{AppError, AppResult}, services::user::UserService, AppState};
+use crate::{
+    AppState,
+    error::{AppError, AppResult},
+    services::user::UserService,
+};
 
 #[derive(Debug, Deserialize)]
 pub struct LoginRequest {
@@ -55,8 +59,8 @@ async fn login(
     State(state): State<AppState>,
     Json(payload): Json<LoginRequest>,
 ) -> AppResult<impl IntoResponse> {
-    use jsonwebtoken::{encode, EncodingKey, Header};
     use crate::middleware::auth::Claims;
+    use jsonwebtoken::{EncodingKey, Header, encode};
 
     // Validate against database
     let user = UserService::verify_credentials(&state.db, &payload.username, &payload.password)
@@ -68,7 +72,7 @@ async fn login(
 
     // Create Access Token
     let expiry = chrono::Utc::now() + chrono::Duration::hours(state.config.jwt_expiry_hours);
-    
+
     let claims = Claims {
         sub: user.id.to_string(),
         username: user.username.clone(),
@@ -91,22 +95,25 @@ async fn login(
         .same_site(SameSite::Strict)
         // .secure(true) // TODO: Enable in production with HTTPS
         .build();
-    
+
     let mut headers = HeaderMap::new();
     headers.insert(header::SET_COOKIE, cookie.to_string().parse().unwrap());
 
-    Ok((headers, Json(LoginResponse {
-        token: access_token,
-        expires_at,
-    })))
+    Ok((
+        headers,
+        Json(LoginResponse {
+            token: access_token,
+            expires_at,
+        }),
+    ))
 }
 
 async fn refresh(
     State(state): State<AppState>,
     headers: HeaderMap,
 ) -> AppResult<impl IntoResponse> {
-    use jsonwebtoken::{encode, EncodingKey, Header};
     use crate::middleware::auth::Claims;
+    use jsonwebtoken::{EncodingKey, Header, encode};
 
     // Get refresh token from cookie
     let cookie = headers
@@ -129,7 +136,7 @@ async fn refresh(
 
     // Create new Access Token
     let expiry = chrono::Utc::now() + chrono::Duration::hours(state.config.jwt_expiry_hours);
-    
+
     let claims = Claims {
         sub: user.id.to_string(),
         username: user.username.clone(),
@@ -149,34 +156,35 @@ async fn refresh(
         .http_only(true)
         .same_site(SameSite::Strict)
         .build();
-    
+
     let mut headers = HeaderMap::new();
     headers.insert(header::SET_COOKIE, cookie.to_string().parse().unwrap());
 
-    Ok((headers, Json(LoginResponse {
-        token: access_token,
-        expires_at: expiry,
-    })))
+    Ok((
+        headers,
+        Json(LoginResponse {
+            token: access_token,
+            expires_at: expiry,
+        }),
+    ))
 }
 
-async fn logout(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-) -> AppResult<impl IntoResponse> {
+async fn logout(State(state): State<AppState>, headers: HeaderMap) -> AppResult<impl IntoResponse> {
     // Attempt to get token to revoke it in DB
     if let Some(cookie_val) = headers
         .get(header::COOKIE)
-        .and_then(|val| val.to_str().ok()) {
-            if let Some(token) = cookie_val.split(';').find_map(|c| {
-                let c = c.trim();
-                if c.starts_with(&format!("{}=", REFRESH_TOKEN_COOKIE)) {
-                    Some(c.split_once('=').unwrap().1)
-                } else {
-                    None
-                }
-            }) {
-                let _ = UserService::revoke_refresh_token(&state.db, token).await;
+        .and_then(|val| val.to_str().ok())
+    {
+        if let Some(token) = cookie_val.split(';').find_map(|c| {
+            let c = c.trim();
+            if c.starts_with(&format!("{}=", REFRESH_TOKEN_COOKIE)) {
+                Some(c.split_once('=').unwrap().1)
+            } else {
+                None
             }
+        }) {
+            let _ = UserService::revoke_refresh_token(&state.db, token).await;
+        }
     }
 
     // Clear Cookie
@@ -186,19 +194,20 @@ async fn logout(
         .same_site(SameSite::Strict)
         .max_age(time::Duration::seconds(0))
         .build();
-    
+
     let mut headers = HeaderMap::new();
     headers.insert(header::SET_COOKIE, cookie.to_string().parse().unwrap());
 
-    Ok((headers, Json(MessageResponse {
-        success: true,
-        message: "Logged out successfully".to_string(),
-    })))
+    Ok((
+        headers,
+        Json(MessageResponse {
+            success: true,
+            message: "Logged out successfully".to_string(),
+        }),
+    ))
 }
 
-async fn current_user(
-    claims: crate::middleware::auth::Claims,
-) -> AppResult<Json<UserInfo>> {
+async fn current_user(claims: crate::middleware::auth::Claims) -> AppResult<Json<UserInfo>> {
     Ok(Json(UserInfo {
         id: claims.sub.parse().unwrap_or(0),
         username: claims.username,
@@ -210,21 +219,24 @@ async fn change_password(
     claims: crate::middleware::auth::Claims,
     Json(payload): Json<ChangePasswordRequest>,
 ) -> AppResult<Json<MessageResponse>> {
-    let user_id: i32 = claims.sub.parse()
+    let user_id: i32 = claims
+        .sub
+        .parse()
         .map_err(|_| AppError::Auth("Invalid user ID".to_string()))?;
-    
+
     // Verify current password
     let user = UserService::find_by_username(&state.db, &claims.username)
         .await?
         .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
-    
-    if !crate::services::password::verify_password(&payload.current_password, &user.password_hash)? {
+
+    if !crate::services::password::verify_password(&payload.current_password, &user.password_hash)?
+    {
         return Err(AppError::Auth("Current password is incorrect".to_string()));
     }
-    
+
     // Update password
     UserService::update_password(&state.db, user_id, &payload.new_password).await?;
-    
+
     Ok(Json(MessageResponse {
         success: true,
         message: "Password changed successfully".to_string(),
