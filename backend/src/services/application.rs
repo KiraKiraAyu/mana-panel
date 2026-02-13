@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::io::ErrorKind;
 use std::net::TcpListener;
+use std::sync::OnceLock;
+use tokio::sync::Mutex;
 
 use crate::error::{AppError, AppResult};
 use crate::services::docker::{
@@ -21,6 +23,12 @@ const APP_CATEGORY_PROXY: &str = "proxy";
 
 const TEMPLATE_NGINX_STANDARD: &str = "nginx-standard";
 const TEMPLATE_CADDY_AUTOSSL: &str = "caddy-autossl";
+
+static APP_OPERATION_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+fn app_operation_lock() -> &'static Mutex<()> {
+    APP_OPERATION_LOCK.get_or_init(|| Mutex::new(()))
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ApplicationTemplate {
@@ -213,6 +221,8 @@ impl ApplicationManager {
         &self,
         req: InstallApplicationRequest,
     ) -> AppResult<DockerActionResponse> {
+        let _operation_guard = app_operation_lock().lock().await;
+
         let template = self.find_template(&req.template_id).ok_or_else(|| {
             AppError::Validation(format!("Unknown template_id: {}", req.template_id))
         })?;
@@ -323,6 +333,8 @@ impl ApplicationManager {
     }
 
     pub async fn start_application(&self, container_id: &str) -> AppResult<DockerActionResponse> {
+        let _operation_guard = app_operation_lock().lock().await;
+
         let preflight = self.preflight_start(container_id).await?;
         if !preflight.ok {
             return Err(AppError::Validation(

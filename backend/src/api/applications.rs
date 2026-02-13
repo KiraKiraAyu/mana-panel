@@ -126,7 +126,7 @@ async fn install_application(
             image_pulled: false,
             pull_progress: vec![],
         })),
-        Err(AppError::System(msg)) if msg.contains("No such image") => {
+        Err(e) if e.is_docker_image_not_found() => {
             let image = resolve_install_image(&manager, &payload).ok_or_else(|| {
                 AppError::Validation(
                     "No such image and failed to resolve image from template/install payload"

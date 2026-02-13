@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::error::{AppError, AppResult};
+use crate::error::{AppError, AppResult, DockerErrorKind};
 
 /// High-level Docker service that wraps the bollard client.
 #[derive(Clone)]
@@ -150,8 +150,13 @@ impl DockerService {
     /// Create a new `DockerService`.  Tries the platform default connection
     /// (unix socket on Linux, named pipe on Windows).
     pub fn new() -> AppResult<Self> {
-        let client = Docker::connect_with_local_defaults()
-            .map_err(|e| AppError::System(format!("Failed to connect to Docker daemon: {}", e)))?;
+        let client = Docker::connect_with_local_defaults().map_err(|e| {
+            AppError::docker(
+                "connect",
+                DockerErrorKind::DaemonUnavailable,
+                format!("Failed to connect to Docker daemon: {}", e),
+            )
+        })?;
         Ok(Self {
             client: Arc::new(client),
         })
@@ -176,7 +181,7 @@ impl DockerService {
             .client
             .list_containers(Some(opts))
             .await
-            .map_err(|e| AppError::System(format!("Docker list containers: {}", e)))?;
+            .map_err(|e| Self::map_docker_error("list_containers", e))?;
 
         Ok(containers.into_iter().map(Self::map_container).collect())
     }
@@ -187,7 +192,7 @@ impl DockerService {
             .client
             .inspect_container(id, None::<InspectContainerOptions>)
             .await
-            .map_err(|e| AppError::System(format!("Docker inspect container: {}", e)))?;
+            .map_err(|e| Self::map_docker_error("inspect_container", e))?;
 
         Ok(Self::map_container_detail(info))
     }
@@ -197,7 +202,7 @@ impl DockerService {
         self.client
             .start_container::<String>(id, None)
             .await
-            .map_err(|e| AppError::System(format!("Docker start container: {}", e)))?;
+            .map_err(|e| Self::map_docker_error("start_container", e))?;
         Ok(DockerActionResponse {
             success: true,
             message: format!("Container {} started", id),
@@ -209,7 +214,7 @@ impl DockerService {
         self.client
             .stop_container(id, None)
             .await
-            .map_err(|e| AppError::System(format!("Docker stop container: {}", e)))?;
+            .map_err(|e| Self::map_docker_error("stop_container", e))?;
         Ok(DockerActionResponse {
             success: true,
             message: format!("Container {} stopped", id),
@@ -221,7 +226,7 @@ impl DockerService {
         self.client
             .restart_container(id, None)
             .await
-            .map_err(|e| AppError::System(format!("Docker restart container: {}", e)))?;
+            .map_err(|e| Self::map_docker_error("restart_container", e))?;
         Ok(DockerActionResponse {
             success: true,
             message: format!("Container {} restarted", id),
@@ -237,7 +242,7 @@ impl DockerService {
         self.client
             .remove_container(id, Some(opts))
             .await
-            .map_err(|e| AppError::System(format!("Docker remove container: {}", e)))?;
+            .map_err(|e| Self::map_docker_error("remove_container", e))?;
         Ok(DockerActionResponse {
             success: true,
             message: format!("Container {} removed", id),
@@ -260,7 +265,7 @@ impl DockerService {
             match result {
                 Ok(output) => lines.push(output.to_string()),
                 Err(e) => {
-                    return Err(AppError::System(format!("Docker logs: {}", e)));
+                    return Err(Self::map_docker_error("container_logs", e));
                 }
             }
         }
@@ -278,7 +283,7 @@ impl DockerService {
         let mut stream = self.client.stats(id, Some(opts));
 
         if let Some(result) = stream.next().await {
-            let stats = result.map_err(|e| AppError::System(format!("Docker stats: {}", e)))?;
+            let stats = result.map_err(|e| Self::map_docker_error("container_stats", e))?;
 
             // CPU percentage
             let cpu_delta = stats.cpu_stats.cpu_usage.total_usage as f64
@@ -336,7 +341,11 @@ impl DockerService {
                 pids,
             })
         } else {
-            Err(AppError::System("No stats received".into()))
+            Err(AppError::docker(
+                "container_stats",
+                DockerErrorKind::Unknown,
+                "No stats received",
+            ))
         }
     }
 
@@ -419,7 +428,7 @@ impl DockerService {
             .client
             .create_container(opts, config)
             .await
-            .map_err(|e| AppError::System(format!("Docker create container: {}", e)))?;
+            .map_err(|e| Self::map_docker_error("create_container", e))?;
 
         Ok(DockerActionResponse {
             success: true,
@@ -440,7 +449,7 @@ impl DockerService {
             .client
             .list_images(Some(opts))
             .await
-            .map_err(|e| AppError::System(format!("Docker list images: {}", e)))?;
+            .map_err(|e| Self::map_docker_error("list_images", e))?;
 
         Ok(images.into_iter().map(Self::map_image).collect())
     }
@@ -472,7 +481,7 @@ impl DockerService {
         self.client
             .remove_image(id, Some(opts), None)
             .await
-            .map_err(|e| AppError::System(format!("Docker remove image: {}", e)))?;
+            .map_err(|e| Self::map_docker_error("remove_image", e))?;
 
         Ok(DockerActionResponse {
             success: true,
@@ -515,7 +524,7 @@ impl DockerService {
                     }
                 }
                 Err(e) => {
-                    return Err(AppError::System(format!("Docker pull image: {}", e)));
+                    return Err(Self::map_docker_error("pull_image_stream", e));
                 }
             }
         }
@@ -550,7 +559,7 @@ impl DockerService {
                     });
                 }
                 Err(e) => {
-                    return Err(AppError::System(format!("Docker pull image: {}", e)));
+                    return Err(Self::map_docker_error("pull_image", e));
                 }
             }
         }
@@ -559,6 +568,61 @@ impl DockerService {
     }
 
     // -- Helpers (private) --------------------------------------------------
+
+    fn map_docker_error(operation: &str, err: bollard::errors::Error) -> AppError {
+        let message = err.to_string();
+        let lower = message.to_lowercase();
+        let kind = Self::classify_docker_error(&lower);
+
+        AppError::docker(
+            operation,
+            kind,
+            format!("Docker {}: {}", operation, message),
+        )
+    }
+
+    fn classify_docker_error(message_lower: &str) -> DockerErrorKind {
+        if message_lower.contains("cannot connect to the docker daemon")
+            || message_lower.contains("error during connect")
+            || message_lower.contains("docker daemon is not running")
+        {
+            DockerErrorKind::DaemonUnavailable
+        } else if message_lower.contains("no such image") {
+            DockerErrorKind::ImageNotFound
+        } else if message_lower.contains("no such container") {
+            DockerErrorKind::ContainerNotFound
+        } else if message_lower.contains("address already in use")
+            || message_lower.contains("port is already allocated")
+        {
+            DockerErrorKind::PortConflict
+        } else if message_lower.contains("container name")
+            && message_lower.contains("already in use")
+        {
+            DockerErrorKind::NameConflict
+        } else if message_lower.contains("conflict") {
+            DockerErrorKind::Conflict
+        } else if message_lower.contains("permission denied") {
+            DockerErrorKind::PermissionDenied
+        } else if message_lower.contains("authentication required")
+            || message_lower.contains("unauthorized")
+            || message_lower.contains("requested access to the resource is denied")
+            || message_lower.contains("pull access denied")
+        {
+            DockerErrorKind::RegistryAuth
+        } else if message_lower.contains("invalid reference format") {
+            DockerErrorKind::InvalidReference
+        } else if message_lower.contains("context deadline exceeded")
+            || message_lower.contains("deadline exceeded")
+            || message_lower.contains("timed out")
+            || message_lower.contains("timeout")
+        {
+            DockerErrorKind::Timeout
+        } else if message_lower.contains("not found") {
+            DockerErrorKind::NotFound
+        } else {
+            DockerErrorKind::Unknown
+        }
+    }
 
     fn map_container(c: ContainerSummary) -> ContainerInfo {
         let ports = c
