@@ -1,0 +1,16 @@
+{# Simplified Caddy template: domain -> upstream reverse proxy #}
+
+{% if email is defined and email != "" %}
+{
+    email {{ email }}
+}
+{% endif %}
+
+{{ domain }} {
+    reverse_proxy {{ upstream_host }}:{{ upstream_port }}
+
+    log {
+        output stdout
+        format console
+    }
+}

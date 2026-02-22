@@ -1,0 +1,430 @@
+<template>
+    <Transition name="fade">
+        <div
+            v-if="open"
+            class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
+            style="backdrop-filter: blur(4px)"
+        >
+            <div
+                class="absolute inset-0 bg-black/60 transition-opacity"
+                @click="$emit('close')"
+            ></div>
+
+            <div
+                class="relative w-full max-w-4xl max-h-[90vh] flex flex-col rounded-2xl border border-border bg-surface shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+            >
+                <div
+                    class="flex items-center justify-between p-5 border-b border-border bg-surface-secondary/30"
+                >
+                    <div>
+                        <h2 class="text-xl font-bold text-text-primary">
+                            Deploy Template
+                        </h2>
+                        <p class="text-sm text-text-muted">
+                            {{ template?.name }}
+                            <span class="opacity-50"
+                                >v{{ template?.version }}</span
+                            >
+                        </p>
+                    </div>
+                    <button
+                        @click="$emit('close')"
+                        class="btn btn-ghost btn-sm btn-circle text-text-muted hover:text-text-primary"
+                        :disabled="submitting"
+                    >
+                        <svg
+                            class="w-5 h-5"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M6 18L18 6M6 6l12 12"
+                            />
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto p-6 scrollbar-thin">
+                    <div
+                        v-if="error"
+                        class="mb-6 p-4 rounded-xl bg-error/10 border border-error/20 text-error text-sm flex gap-3"
+                    >
+                        <svg
+                            class="w-5 h-5 shrink-0"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                            />
+                        </svg>
+                        {{ error }}
+                    </div>
+
+                    <form
+                        id="installForm"
+                        @submit.prevent="$emit('submit')"
+                        class="space-y-8"
+                    >
+                        <div class="space-y-4">
+                            <h3
+                                class="text-sm font-semibold uppercase tracking-wider text-text-secondary border-b border-border pb-2"
+                            >
+                                Configuration
+                            </h3>
+                            <div class="grid grid-cols-1 gap-5">
+                                <div class="form-control space-y-1.5">
+                                    <label
+                                        class="text-sm font-medium text-text-primary"
+                                        >Instance Name</label
+                                    >
+                                    <input
+                                        v-model="form.name"
+                                        type="text"
+                                        :placeholder="form.name"
+                                        class="input w-full bg-background border-border focus:border-reisa-lilac-500 focus:ring-reisa-lilac-500/20 rounded-lg"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div v-if="portFields.length" class="space-y-4">
+                            <h3
+                                class="text-sm font-semibold uppercase tracking-wider text-text-secondary border-b border-border pb-2"
+                            >
+                                Ports
+                            </h3>
+                            <div
+                                class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+                            >
+                                <div
+                                    v-for="port in portFields"
+                                    :key="port.key"
+                                    class="bg-surface-secondary/30 p-3 rounded-lg border border-border/50"
+                                >
+                                    <label
+                                        class="block text-xs font-medium text-text-secondary mb-1.5"
+                                    >
+                                        {{ port.key }}
+                                        <span class="opacity-50"
+                                            >({{ port.endpoint }})</span
+                                        >
+                                        <span
+                                            v-if="port.required"
+                                            class="text-error ml-0.5"
+                                            >*</span
+                                        >
+                                    </label>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs text-text-muted"
+                                            >Host:</span
+                                        >
+                                        <input
+                                            v-model.number="
+                                                form.port_bindings[port.key]
+                                            "
+                                            type="number"
+                                            min="1"
+                                            max="65535"
+                                            :placeholder="
+                                                port.default_host_port
+                                                    ? String(
+                                                          port.default_host_port,
+                                                      )
+                                                    : 'Random'
+                                            "
+                                            class="input w-full h-8 text-sm bg-background border-border focus:border-reisa-lilac-500 rounded px-2 font-mono"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div v-if="paramFields.length" class="space-y-4">
+                            <h3
+                                class="text-sm font-semibold uppercase tracking-wider text-text-secondary border-b border-border pb-2"
+                            >
+                                Template Parameters
+                            </h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                <div
+                                    v-for="field in paramFields"
+                                    :key="field.key"
+                                    :class="
+                                        field.input === 'textarea'
+                                            ? 'md:col-span-2'
+                                            : ''
+                                    "
+                                >
+                                    <div
+                                        v-if="field.input === 'boolean'"
+                                        class="flex items-center justify-between p-3 rounded-lg border border-border bg-surface-secondary/20"
+                                    >
+                                        <div class="flex flex-col">
+                                            <span
+                                                class="text-sm font-medium text-text-primary"
+                                                >{{ field.label }}</span
+                                            >
+                                            <span
+                                                class="text-xs text-text-muted mt-0.5"
+                                                >{{ field.description }}</span
+                                            >
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            :checked="
+                                                readBooleanValue(field.key)
+                                            "
+                                            @change="
+                                                setBooleanValue(
+                                                    field.key,
+                                                    $event,
+                                                )
+                                            "
+                                            class="toggle toggle-sm accent-reisa-lilac-500"
+                                        />
+                                    </div>
+
+                                    <div
+                                        v-else-if="field.input === 'textarea'"
+                                        class="space-y-1.5"
+                                    >
+                                        <div class="flex justify-between">
+                                            <label
+                                                class="text-sm font-medium text-text-primary"
+                                            >
+                                                {{ field.label }}
+                                                <span
+                                                    v-if="field.required"
+                                                    class="text-error"
+                                                    >*</span
+                                                >
+                                            </label>
+                                        </div>
+                                        <textarea
+                                            v-model="form.values[field.key]"
+                                            :placeholder="
+                                                field.placeholder ?? undefined
+                                            "
+                                            class="textarea w-full min-h-25 bg-background border-border focus:border-reisa-lilac-500 rounded-lg text-sm font-mono leading-relaxed"
+                                        ></textarea>
+                                        <p class="text-xs text-text-muted">
+                                            {{ field.description }}
+                                        </p>
+                                    </div>
+
+                                    <div
+                                        v-else-if="
+                                            field.input === 'select' &&
+                                            field.options?.length
+                                        "
+                                        class="space-y-1.5"
+                                    >
+                                        <label
+                                            class="text-sm font-medium text-text-primary"
+                                        >
+                                            {{ field.label }}
+                                            <span
+                                                v-if="field.required"
+                                                class="text-error"
+                                                >*</span
+                                            >
+                                        </label>
+                                        <select
+                                            v-model="form.values[field.key]"
+                                            class="select w-full bg-background border-border focus:border-reisa-lilac-500 rounded-lg"
+                                        >
+                                            <option
+                                                v-for="opt in field.options"
+                                                :key="opt"
+                                                :value="opt"
+                                            >
+                                                {{ opt }}
+                                            </option>
+                                        </select>
+                                        <p
+                                            class="text-xs text-text-muted truncate"
+                                            :title="field.description"
+                                        >
+                                            {{ field.description }}
+                                        </p>
+                                    </div>
+
+                                    <div v-else class="space-y-1.5">
+                                        <label
+                                            class="text-sm font-medium text-text-primary"
+                                        >
+                                            {{ field.label }}
+                                            <span
+                                                v-if="field.required"
+                                                class="text-error"
+                                                >*</span
+                                            >
+                                        </label>
+                                        <input
+                                            v-model="form.values[field.key]"
+                                            :type="
+                                                resolveInputType(field.input)
+                                            "
+                                            :placeholder="
+                                                field.placeholder ?? undefined
+                                            "
+                                            class="input w-full bg-background border-border focus:border-reisa-lilac-500 rounded-lg"
+                                        />
+                                        <p
+                                            class="text-xs text-text-muted truncate"
+                                            :title="field.description"
+                                        >
+                                            {{ field.description }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div
+                            v-if="validationErrors.length"
+                            class="p-4 rounded-xl bg-warning/10 border border-warning/20"
+                        >
+                            <div
+                                class="flex items-center gap-2 text-warning font-medium mb-2 text-sm"
+                            >
+                                <svg
+                                    class="w-4 h-4"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                                    />
+                                </svg>
+                                配置检查
+                            </div>
+                            <ul
+                                class="list-disc list-inside text-xs text-text-secondary space-y-1 pl-1"
+                            >
+                                <li
+                                    v-for="item in validationErrors"
+                                    :key="item"
+                                >
+                                    {{ item }}
+                                </li>
+                            </ul>
+                        </div>
+                    </form>
+                </div>
+
+                <div
+                    class="p-5 border-t border-border bg-surface-secondary/30 flex items-center justify-between gap-4"
+                >
+                    <div
+                        class="text-sm text-text-muted font-medium animate-pulse"
+                        v-if="submitting"
+                    >
+                        {{ statusMessage || 'Processing...' }}
+                    </div>
+                    <div class="flex items-center gap-3 ml-auto">
+                        <button
+                            type="button"
+                            class="btn btn-ghost hover:bg-surface-secondary text-text-secondary"
+                            @click="$emit('close')"
+                            :disabled="submitting"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            form="installForm"
+                            class="btn bg-reisa-lilac-500 hover:bg-reisa-lilac-600 text-white border-none shadow-lg shadow-reisa-lilac-500/20 min-w-30"
+                            :disabled="!canSubmit || submitting"
+                        >
+                            <span
+                                v-if="submitting"
+                                class="loading loading-spinner loading-sm mr-2"
+                            ></span>
+                            {{ submitting ? 'Deploying...' : 'Deploy' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </Transition>
+</template>
+
+<script setup lang="ts">
+import type {
+    ApplicationTemplate,
+    ApplicationTemplateParam,
+} from '@/api/applications'
+
+export interface InstallFormState {
+    template_id: string
+    name: string
+    values: Record<string, string>
+    port_bindings: Record<string, number | undefined>
+}
+
+export interface InstallPortField {
+    key: string
+    endpoint: string
+    required: boolean
+    default_host_port: number | null
+}
+
+const props = defineProps<{
+    open: boolean
+    template: ApplicationTemplate | null
+    form: InstallFormState
+    paramFields: ApplicationTemplateParam[]
+    portFields: InstallPortField[]
+    submitting: boolean
+    error: string
+    validationErrors: string[]
+    statusMessage: string
+    canSubmit: boolean
+}>()
+
+defineEmits<{
+    (e: 'close'): void
+    (e: 'submit'): void
+}>()
+
+const resolveInputType = (input: string): string => {
+    if (input === 'password') return 'password'
+    if (input === 'number') return 'number'
+    return 'text'
+}
+
+const readBooleanValue = (key: string): boolean => {
+    const raw = props.form.values[key] ?? ''
+    return String(raw).trim().toLowerCase() === 'true'
+}
+
+const setBooleanValue = (key: string, event: Event) => {
+    const target = event.target as HTMLInputElement
+    props.form.values[key] = target.checked ? 'true' : 'false'
+}
+</script>
+
+<style scoped>
+.fade-enter-active,
+.fade-leave-active {
+    transition: opacity 0.2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+    opacity: 0;
+}
+</style>

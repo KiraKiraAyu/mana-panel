@@ -1,0 +1,19 @@
+services:
+    app:
+        image: "{{ app_image }}"
+        container_name: "{{ app_name }}"
+        restart: unless-stopped
+        ports:
+            - "${PANEL_APP_PORT_HTTP}:80/tcp"
+            - "${PANEL_APP_PORT_HTTPS}:443/tcp"
+        volumes:
+            - "./conf/Caddyfile:/etc/caddy/Caddyfile:ro"
+            - "./data:/data"
+            - "./config:/config"
+        command:
+            - "caddy"
+            - "run"
+            - "--config"
+            - "/etc/caddy/Caddyfile"
+            - "--adapter"
+            - "caddyfile"

@@ -1,14 +1,54 @@
 import { api } from '@/api'
 
+export interface ApplicationTemplateParam {
+    key: string
+    label: string
+    description: string
+    required: boolean
+    default_value: string | null
+    input: string // text | password | textarea | number | boolean | select
+    placeholder: string | null
+    env: string | null
+    env_key?: string
+    rule?: string
+    options?: string[]
+}
+
+export interface ApplicationTemplatePort {
+    key: string
+    container_port: number
+    protocol: string
+    default_host_port: number | null
+    required: boolean
+}
+
+export interface ApplicationTemplateEnv {
+    key: string
+    value: string | null
+    from: string | null
+    required: boolean
+}
+
+export interface ApplicationTemplateConfigFile {
+    template: string
+    target: string
+}
+
 export interface ApplicationTemplate {
     id: string
     name: string
-    description: string
+    version: string
     category: string
-    image: string
-    default_ports: number[]
-    requires_domain: boolean
-    requires_upstream: boolean
+    description: string
+    icon_path: string | null
+    readme_path: string | null
+    compose_file: string
+    params: ApplicationTemplateParam[]
+    ports: ApplicationTemplatePort[]
+    env: ApplicationTemplateEnv[]
+    config_files: ApplicationTemplateConfigFile[]
+    has_conf_templates: boolean
+    app_dir: string
 }
 
 export interface ApplicationPort {
@@ -23,40 +63,21 @@ export interface ApplicationInstance {
     name: string
     template_id: string
     category: string
-    image: string
     state: string
-    status: string
     ports: ApplicationPort[]
-    labels: Record<string, string>
 }
 
 export interface InstallApplicationRequest {
     template_id: string
     name?: string
-    image_override?: string
-    upstream_host?: string
-    upstream_port?: number
-    domain?: string
-    listen_http_port?: number
-    listen_https_port?: number
+
+    // Generic app values (app.toml params)
+    values?: Record<string, string>
+
+    // Host bindings by app.toml [[port]].key => host port
+    port_bindings?: Record<string, number>
+
     env?: string[]
-    replace_existing?: boolean
-}
-
-export interface PortConflict {
-    port: number
-    occupied_by: string
-    occupant_type: 'container' | 'host-process' | string
-    occupant_container_id: string | null
-    occupant_image: string | null
-    suggestion: string
-}
-
-export interface PreflightResult {
-    ok: boolean
-    requested_ports: number[]
-    conflicts: PortConflict[]
-    warnings: string[]
 }
 
 export interface DockerActionResponse {
@@ -64,21 +85,8 @@ export interface DockerActionResponse {
     message: string
 }
 
-export interface InstallPullProgress {
-    status: string
-    id?: string
-    progress?: string
-}
-
 export interface InstallApplicationResponse {
     action: DockerActionResponse
-    image_pulled: boolean
-    pull_progress: InstallPullProgress[]
-}
-
-interface ImageExistsResponse {
-    image: string
-    exists: boolean
 }
 
 export const applicationsApi = {
@@ -92,26 +100,10 @@ export const applicationsApi = {
         return response.data
     },
 
-    async imageExists(image: string): Promise<boolean> {
-        const target = image.trim()
-        if (!target) return false
-
-        const response = await api.get('/applications/images/exists', {
-            params: { image: target },
-        })
-        const data = response.data as ImageExistsResponse
-        return !!data.exists
-    },
-
     async install(
         payload: InstallApplicationRequest,
     ): Promise<InstallApplicationResponse> {
         const response = await api.post('/applications/install', payload)
-        return response.data
-    },
-
-    async preflightStart(instanceId: string): Promise<PreflightResult> {
-        const response = await api.post(`/applications/${instanceId}/preflight`)
         return response.data
     },
 

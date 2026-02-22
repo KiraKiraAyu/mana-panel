@@ -1,10 +1,10 @@
 use axum::Router;
+use clap::{Parser, Subcommand};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use clap::{Parser, Subcommand};
 
 use mana_panel_backend::{
     AppState, api,
@@ -30,19 +30,20 @@ enum Commands {
 
 #[tokio::main]
 async fn main() {
+    // Load config first so runtime setup is driven by centralized config.
+    let config = Config::from_env();
+
     tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "mana_panel_backend=debug,tower_http=debug".into()),
-        )
+        .with(tracing_subscriber::EnvFilter::new(
+            config.log_filter.as_str(),
+        ))
         .with(tracing_subscriber::fmt::layer())
         .init();
 
     // Check for CLI args first
     let cli = Cli::parse();
-    
-    // Load config and db for all modes
-    let config = Config::from_env();
+
+    // Load db for all modes
     let db_conn = db::init_database(&config.database_url)
         .await
         .expect("Failed to initialize database");
@@ -59,7 +60,7 @@ async fn main() {
                 .collect();
 
             tracing::info!("Creating user: {}", username);
-            
+
             match UserService::create_user(&db, username, &password).await {
                 Ok(_) => {
                     println!("\nSUCCESS: User created successfully!");

@@ -1,12 +1,14 @@
 use axum::{
-    extract::FromRequestParts,
-    http::{request::Parts, StatusCode},
-    response::{IntoResponse, Response},
     Json,
+    extract::FromRequestParts,
+    http::{StatusCode, request::Parts},
+    response::{IntoResponse, Response},
 };
-use jsonwebtoken::{decode, DecodingKey, Validation};
+use jsonwebtoken::{DecodingKey, Validation, decode};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+
+use crate::AppState;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
@@ -15,13 +17,13 @@ pub struct Claims {
     pub exp: usize,
 }
 
-impl<S> FromRequestParts<S> for Claims
-where
-    S: Send + Sync,
-{
+impl FromRequestParts<AppState> for Claims {
     type Rejection = AuthError;
 
-    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
         let auth_header = parts
             .headers
             .get("Authorization")
@@ -32,9 +34,7 @@ where
             .strip_prefix("Bearer ")
             .ok_or(AuthError::InvalidToken)?;
 
-        // Get JWT secret from environment (in production, this should be more robust)
-        let secret = std::env::var("JWT_SECRET")
-            .unwrap_or_else(|_| "your-super-secret-key-change-in-production".to_string());
+        let secret = &state.config.jwt_secret;
 
         let token_data = decode::<Claims>(
             token,

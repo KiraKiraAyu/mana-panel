@@ -1,0 +1,46 @@
+[metadata]
+id = "nginx-standard"
+name = "Nginx"
+version = "2.1.0"
+category = "proxy"
+description = "Minimal Nginx reverse-proxy template. Advanced routing and SSL will be managed by Website features."
+readme = "README.md"
+compose_file = "docker-compose.yml"
+image = "nginx:stable-alpine"
+
+# Minimal reverse-proxy fields
+[[param]]
+key = "server_name"
+label = "Server Name"
+description = "Domain for this proxy server. Use '_' for catch-all."
+required = true
+default = "_"
+input = "text"
+placeholder = "example.com"
+
+
+
+[[param]]
+key = "proxy_url"
+label = "Upstream URL"
+description = "Target upstream URL, e.g. http://host.docker.internal:3000"
+required = true
+default = "http://host.docker.internal:3000"
+input = "text"
+placeholder = "http://host.docker.internal:3000"
+
+[[port]]
+key = "http"
+container_port = 80
+protocol = "tcp"
+default_host_port = 80
+required = true
+env_key = "PANEL_APP_PORT_HTTP"
+
+[[config_file]]
+template = "conf/nginx.conf"
+target = "conf/nginx.conf"
+
+[[config_file]]
+template = "conf/default/default.conf.tera"
+target = "conf/default/default.conf"

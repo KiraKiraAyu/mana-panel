@@ -1,0 +1,65 @@
+[metadata]
+id = "caddy-autossl"
+name = "Caddy AutoSSL"
+version = "2.0.0"
+category = "proxy"
+description = "Minimal Caddy reverse proxy with automatic HTTPS. Advanced routing and policies will be managed in Website features."
+readme = "README.md"
+compose_file = "docker-compose.yml"
+image = "caddy:2-alpine"
+
+[[param]]
+key = "domain"
+label = "Domain"
+description = "Public domain for this reverse proxy (required for automatic HTTPS)."
+required = true
+default = ""
+input = "text"
+placeholder = "example.com"
+
+[[param]]
+key = "upstream_host"
+label = "Upstream Host"
+description = "Target host to proxy traffic to."
+required = true
+default = "host.docker.internal"
+input = "text"
+placeholder = "host.docker.internal"
+
+[[param]]
+key = "upstream_port"
+label = "Upstream Port"
+description = "Target port to proxy traffic to."
+required = true
+default = "3000"
+input = "number"
+placeholder = "3000"
+
+[[param]]
+key = "email"
+label = "ACME Email"
+description = "Optional email used for Let's Encrypt account registration."
+required = false
+default = ""
+input = "text"
+placeholder = "admin@example.com"
+
+[[port]]
+key = "http"
+container_port = 80
+protocol = "tcp"
+default_host_port = 80
+required = true
+env_key = "PANEL_APP_PORT_HTTP"
+
+[[port]]
+key = "https"
+container_port = 443
+protocol = "tcp"
+default_host_port = 443
+required = true
+env_key = "PANEL_APP_PORT_HTTPS"
+
+[[config_file]]
+template = "conf/Caddyfile.tera"
+target = "conf/Caddyfile"
