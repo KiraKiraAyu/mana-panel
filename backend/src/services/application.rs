@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
 
 use std::path::{Path, PathBuf};
@@ -9,12 +9,16 @@ use tokio::sync::Mutex;
 use uuid::Uuid;
 
 use crate::error::{AppError, AppResult};
+use crate::services::application_task::{
+    ApplicationTask, ApplicationTaskLogLevel, ApplicationTaskManager,
+};
 use crate::services::compose::{ComposeContainerStatus, ComposeProject, ComposeService};
-use crate::services::docker::{DockerActionResponse, DockerService};
+use crate::services::docker::{DockerActionResponse, DockerService, PullProgress};
 
 const APP_COMPOSE_BASE_DIR: &str = ".mana-panel/applications";
 
 const META_FILE_NAME: &str = "meta.json";
+const RESOLVED_CONFIG_FILE_NAME: &str = "resolved_config.json";
 const DEFAULT_APP_TOML: &str = "app.toml";
 const DEFAULT_COMPOSE_FILE: &str = "docker-compose.yml";
 
@@ -24,6 +28,8 @@ fn app_operation_lock() -> &'static Mutex<()> {
     APP_OPERATION_LOCK.get_or_init(|| Mutex::new(()))
 }
 
+/// Defines supported UI/input schema types for template parameters.
+/// These values are serialized to the frontend and used for validation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum InputType {
@@ -35,6 +41,8 @@ pub enum InputType {
     Select,
 }
 
+/// Describes one user-facing parameter declared by an application template.
+/// A parameter can map to compose variables, env output keys, and validation rules.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApplicationTemplateParam {
     pub key: String,
@@ -54,6 +62,8 @@ pub struct ApplicationTemplateParam {
     pub options: Vec<String>,
 }
 
+/// Describes one logical port entry in a template.
+/// The `key` is user-facing while `container_port/protocol` define runtime mapping.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApplicationTemplatePort {
     pub key: String,
@@ -63,6 +73,8 @@ pub struct ApplicationTemplatePort {
     pub required: bool,
 }
 
+/// Declares an environment variable rule in a template.
+/// Values may be static (`value`) or derived from another parameter (`from`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApplicationTemplateEnv {
     pub key: String,
@@ -71,16 +83,15 @@ pub struct ApplicationTemplateEnv {
     pub required: bool,
 }
 
-/// Declares a configuration file that must be rendered at install time and
-/// mounted into the container.
+/// Compose service definition extracted from a template compose file.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ApplicationTemplateConfigFile {
-    /// Relative path to the Tera template inside the app package.
-    pub template: String,
-    /// Destination inside the instance directory (rendered output).
-    pub target: String,
+pub struct ApplicationTemplateService {
+    pub name: String,
+    pub image: Option<String>,
 }
 
+/// Canonical application template returned by the backend.
+/// This is the aggregate model used by the UI to render forms and install options.
 #[derive(Debug, Clone, Serialize)]
 pub struct ApplicationTemplate {
     pub id: String,
@@ -93,8 +104,9 @@ pub struct ApplicationTemplate {
 
     // Compose template metadata
     pub compose_file: String,
-    #[serde(skip_serializing)]
-    pub image: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub services: Vec<ApplicationTemplateService>,
 
     // Dynamic form + runtime mappings
     pub params: Vec<ApplicationTemplateParam>,
@@ -102,13 +114,14 @@ pub struct ApplicationTemplate {
     pub env: Vec<ApplicationTemplateEnv>,
 
     /// Explicit configuration file declarations from `[[config_file]]`.
-    pub config_files: Vec<ApplicationTemplateConfigFile>,
+    pub config_files: Vec<AppTomlConfigFile>,
 
     // Helpful for UI
     pub has_conf_templates: bool,
     pub app_dir: String,
 }
 
+/// Runtime-exposed port information for an installed application instance.
 #[derive(Debug, Clone, Serialize)]
 pub struct ApplicationPort {
     pub ip: String,
@@ -118,6 +131,17 @@ pub struct ApplicationPort {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct ApplicationInstanceService {
+    pub name: String,
+    pub container_name: String,
+    pub state: String,
+    pub health: Option<String>,
+    pub ports: Vec<ApplicationPort>,
+}
+
+/// Installed application instance model returned to the UI.
+/// This reflects persisted metadata plus current compose/container state.
+#[derive(Debug, Clone, Serialize)]
 pub struct ApplicationInstance {
     pub id: Uuid,
     pub name: String,
@@ -125,26 +149,70 @@ pub struct ApplicationInstance {
     pub category: String,
     pub state: String,
     pub ports: Vec<ApplicationPort>,
+    pub services: Vec<ApplicationInstanceService>,
 }
 
+/// Typed install value used by the install request API.
+/// Values are accepted in native JSON form and normalized internally.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ApplicationInstallValue {
+    String(String),
+    Integer(i64),
+    Float(f64),
+    Boolean(bool),
+}
+
+/// Normalized resolved value persisted after install.
+/// Stores the final string representation and its original input type.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApplicationResolvedValue {
+    pub key: String,
+    pub input: InputType,
+    pub value: String,
+}
+
+/// Snapshot of the effective install configuration written to disk.
+/// Used for later inspection, edits, upgrades, and troubleshooting.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApplicationResolvedInstallConfig {
+    pub template_id: String,
+    pub instance_id: Uuid,
+    pub instance_name: String,
+    pub values: Vec<ApplicationResolvedValue>,
+    pub port_bindings: HashMap<String, u16>,
+    pub env: HashMap<String, String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ApplicationInstallResult {
+    pub instance_id: Uuid,
+    pub action: DockerActionResponse,
+}
+
+/// API payload for installing an application from a template.
 #[derive(Debug, Clone, Deserialize)]
 pub struct InstallApplicationRequest {
     pub template_id: String,
     pub name: Option<String>,
-    pub values: Option<HashMap<String, String>>,
+    #[serde(default)]
+    pub typed_values: HashMap<String, ApplicationInstallValue>,
     pub port_bindings: Option<HashMap<String, u16>>,
     pub env: Option<Vec<String>>,
 }
 
+/// Persisted metadata for one installed instance.
+/// This file is used to locate compose project identity and template linkage.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ApplicationInstanceMeta {
     pub id: Uuid,
     pub name: String,
     pub template_id: String,
     pub category: String,
-    pub project_name: String,
 }
 
+/// Raw `[metadata]` section from `app.toml`.
+/// This is an input-only parsing model before validation/normalization.
 #[derive(Debug, Clone, Deserialize)]
 struct AppMetadata {
     id: String,
@@ -155,9 +223,9 @@ struct AppMetadata {
     icon: Option<String>,
     readme: Option<String>,
     compose_file: Option<String>,
-    image: Option<String>,
 }
 
+/// Raw `[[port]]` section entry parsed from `app.toml`.
 #[derive(Debug, Clone, Deserialize)]
 struct AppTomlPort {
     key: String,
@@ -167,6 +235,7 @@ struct AppTomlPort {
     required: Option<bool>,
 }
 
+/// Raw `[[param]]` section entry parsed from `app.toml`.
 #[derive(Debug, Clone, Deserialize)]
 struct AppTomlParam {
     key: String,
@@ -184,6 +253,7 @@ struct AppTomlParam {
     options: Vec<String>,
 }
 
+/// Raw `[[env]]` section entry parsed from `app.toml`.
 #[derive(Debug, Clone, Deserialize)]
 struct AppTomlEnv {
     key: String,
@@ -192,12 +262,13 @@ struct AppTomlEnv {
     required: Option<bool>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-struct AppTomlConfigFile {
-    template: String,
-    target: String,
+/// `[[config_file]]` entry used for parsing and API output.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppTomlConfigFile {
+    pub path: String,
 }
 
+/// Complete `app.toml` parsing model used before conversion into `ApplicationTemplate`.
 #[derive(Debug, Clone, Deserialize)]
 struct AppTomlDoc {
     metadata: AppMetadata,
@@ -211,20 +282,20 @@ struct AppTomlDoc {
     config_files: Vec<AppTomlConfigFile>,
 }
 
+/// Application domain service responsible for template loading,
+/// instance lifecycle operations, and compose-based orchestration.
 #[derive(Clone)]
 pub struct ApplicationManager {
-    docker: DockerService,
     compose: ComposeService,
     app_root_dir: PathBuf,
     compose_projects_dir: PathBuf,
 }
 
 impl ApplicationManager {
-    pub fn new(docker: DockerService, app_root_dir: PathBuf) -> Self {
+    pub fn new(app_root_dir: PathBuf) -> Self {
         let compose_projects_dir = Self::resolve_compose_projects_dir(&app_root_dir);
 
         Self {
-            docker,
             compose: ComposeService::default(),
             app_root_dir,
             compose_projects_dir,
@@ -233,36 +304,33 @@ impl ApplicationManager {
 
     fn resolve_compose_projects_dir(app_root_dir: &Path) -> PathBuf {
         let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        let mut candidates = Vec::<PathBuf>::new();
 
-        // Typical layouts:
-        // - repo root run:      ./.mana-panel/applications
-        // - repo root + backend: ./backend/.mana-panel/applications
-        // - backend run:        ./.mana-panel/applications
-        candidates.push(cwd.join(APP_COMPOSE_BASE_DIR));
-        candidates.push(cwd.join("backend").join(APP_COMPOSE_BASE_DIR));
-
-        if let Some(parent) = cwd.parent() {
-            candidates.push(parent.join(APP_COMPOSE_BASE_DIR));
-            candidates.push(parent.join("backend").join(APP_COMPOSE_BASE_DIR));
-        }
-
-        // Derive from app_root_dir (usually backend/apps) for stable resolution.
-        if let Some(app_parent) = app_root_dir.parent() {
-            candidates.push(app_parent.join(APP_COMPOSE_BASE_DIR));
-            if let Some(project_root) = app_parent.parent() {
-                candidates.push(project_root.join(APP_COMPOSE_BASE_DIR));
-            }
-        }
-
-        if let Some(existing) = candidates.iter().find(|p| p.is_dir()) {
-            return existing.clone();
-        }
-
-        app_root_dir
+        // Keep instance storage stable across different working directories by
+        // anchoring to the app root parent (typically backend/.mana-panel/applications).
+        let preferred = app_root_dir
             .parent()
             .map(|p| p.join(APP_COMPOSE_BASE_DIR))
-            .unwrap_or_else(|| cwd.join(APP_COMPOSE_BASE_DIR))
+            .unwrap_or_else(|| cwd.join(APP_COMPOSE_BASE_DIR));
+        if preferred.is_dir() {
+            return preferred;
+        }
+
+        // Compatibility fallback for older layouts that may already exist.
+        let mut legacy_candidates = vec![
+            cwd.join(APP_COMPOSE_BASE_DIR),
+            cwd.join("backend").join(APP_COMPOSE_BASE_DIR),
+        ];
+
+        if let Some(parent) = cwd.parent() {
+            legacy_candidates.push(parent.join(APP_COMPOSE_BASE_DIR));
+            legacy_candidates.push(parent.join("backend").join(APP_COMPOSE_BASE_DIR));
+        }
+
+        if let Some(existing) = legacy_candidates.into_iter().find(|p| p.is_dir()) {
+            return existing;
+        }
+
+        preferred
     }
 
     pub fn list_templates(&self) -> Vec<ApplicationTemplate> {
@@ -296,7 +364,7 @@ impl ApplicationManager {
                 }
             };
 
-            let project = self.compose_project_for(&instance_id, &meta.project_name);
+            let project = self.compose_project_for(&instance_id);
             let statuses = match self.compose.ps(&project).await {
                 Ok(items) => items,
                 Err(err) => {
@@ -317,30 +385,124 @@ impl ApplicationManager {
         Ok(instances)
     }
 
-    pub async fn image_exists(&self, image: &str) -> AppResult<bool> {
-        let target = image.trim();
-        if target.is_empty() {
-            return Ok(false);
-        }
-
-        let images = self.docker.list_images(true).await?;
-        let normalized = if target.contains(':') {
-            target.to_string()
-        } else {
-            format!("{}:latest", target)
-        };
-
-        Ok(images.into_iter().any(|img| {
-            img.repo_tags
-                .iter()
-                .any(|tag| tag == target || tag == &normalized)
-        }))
-    }
-
-    pub async fn install_application(
+    pub async fn enqueue_install_application(
         &self,
         req: InstallApplicationRequest,
-    ) -> AppResult<DockerActionResponse> {
+        docker: Option<DockerService>,
+    ) -> ApplicationTask {
+        let task_manager = ApplicationTaskManager::global().clone();
+        let task = task_manager
+            .create_install_task(req.template_id.clone(), req.name.clone())
+            .await;
+        let task_id = task.id.clone();
+
+        let manager = self.clone();
+
+        tokio::spawn(async move {
+            let _ = task_manager
+                .mark_running(&task_id, "Starting application installation")
+                .await;
+            let _ = task_manager
+                .append_log(
+                    &task_id,
+                    ApplicationTaskLogLevel::Info,
+                    "Resolving template and rendering compose files",
+                )
+                .await;
+
+            let template_images = collect_template_images(&manager, &req.template_id);
+            if !template_images.is_empty() {
+                let _ = task_manager
+                    .append_log(
+                        &task_id,
+                        ApplicationTaskLogLevel::Info,
+                        format!("Found {} image(s) to prepare", template_images.len()),
+                    )
+                    .await;
+            }
+
+            if let Some(docker_service) = docker {
+                for image in template_images {
+                    let _ = task_manager
+                        .append_log(
+                            &task_id,
+                            ApplicationTaskLogLevel::Info,
+                            format!("Pulling image {}", image),
+                        )
+                        .await;
+
+                    if let Err(err) = stream_image_pull_progress(
+                        docker_service.clone(),
+                        task_manager.clone(),
+                        task_id.clone(),
+                        image.clone(),
+                    )
+                    .await
+                    {
+                        let _ = task_manager
+                            .mark_failed(
+                                &task_id,
+                                format!("Image pull failed for '{}': {}", image, err),
+                            )
+                            .await;
+                        return;
+                    }
+
+                    let _ = task_manager
+                        .append_log(
+                            &task_id,
+                            ApplicationTaskLogLevel::Info,
+                            format!("Image ready: {}", image),
+                        )
+                        .await;
+                }
+            } else if !template_images.is_empty() {
+                let _ = task_manager
+                    .append_log(
+                        &task_id,
+                        ApplicationTaskLogLevel::Warn,
+                        "Docker API unavailable, skip pre-pull and fallback to compose install",
+                    )
+                    .await;
+            }
+
+            match manager.execute_install_application(req).await {
+                Ok(result) => {
+                    let _ = task_manager
+                        .append_log(
+                            &task_id,
+                            ApplicationTaskLogLevel::Info,
+                            result.action.message.clone(),
+                        )
+                        .await;
+                    let _ = task_manager
+                        .mark_succeeded(
+                            &task_id,
+                            Some(result.instance_id),
+                            format!(
+                                "Application installed successfully (instance: {})",
+                                result.instance_id
+                            ),
+                        )
+                        .await;
+                }
+                Err(err) => {
+                    let _ = task_manager
+                        .mark_failed(&task_id, format!("Application install failed: {}", err))
+                        .await;
+                }
+            }
+
+            let _ = task_manager.prune_finished_older_than(180).await;
+        });
+
+        task
+    }
+
+    async fn execute_install_application(
+        &self,
+        req: InstallApplicationRequest,
+    ) -> AppResult<ApplicationInstallResult> {
         let _guard = app_operation_lock().lock().await;
         self.compose.ensure_available().await?;
 
@@ -356,20 +518,6 @@ impl ApplicationManager {
             .unwrap_or_else(|| format!("mana-{}", template.id));
 
         let instance_id = Uuid::now_v7();
-        let image = template
-            .image
-            .clone()
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .unwrap_or_default();
-
-        if image.trim().is_empty() {
-            return Err(AppError::Validation(format!(
-                "Template '{}' does not define an image",
-                template.id
-            )));
-        }
-
         let resolved_values = self.resolve_install_values(&template, &req)?;
         let resolved_ports = self.resolve_port_bindings(&template, &req)?;
 
@@ -379,7 +527,7 @@ impl ApplicationManager {
             .map_err(|e| AppError::System(format!("Failed to create instance directory: {}", e)))?;
 
         // Generate .env file
-        self.generate_env_file(
+        let resolved_env = self.generate_env_file(
             &template,
             &resolved_values,
             &resolved_ports,
@@ -389,32 +537,39 @@ impl ApplicationManager {
 
         // Build Tera rendering context
         let tera_ctx = self.build_tera_context(
-            &template,
             &resolved_values,
-            &resolved_ports,
             &instance_name,
             &instance_id,
-            &image,
             req.env.as_deref(),
         );
 
         let rendered_conf = self.render_conf_templates(&template, &instance_id, &tera_ctx)?;
         let compose_yaml = self.render_compose_template(&template, &tera_ctx, &rendered_conf)?;
 
-        let project_name = format!("mana-{}", instance_id);
-
         let meta = ApplicationInstanceMeta {
             id: instance_id,
-            name: instance_name,
+            name: instance_name.clone(),
             template_id: template.id.clone(),
             category: template.category.clone(),
-            project_name: project_name.clone(),
         };
 
-        self.write_instance_files(&meta.id, &compose_yaml, &meta)?;
+        let resolved_config = self.build_resolved_install_config(
+            &template,
+            instance_id,
+            &instance_name,
+            &resolved_values,
+            &resolved_ports,
+            &resolved_env,
+        );
 
-        let project = self.compose_project_for(&meta.id, &project_name);
-        self.compose.up(&project).await
+        self.write_instance_files(&meta.id, &compose_yaml, &meta, &resolved_config)?;
+
+        let project = self.compose_project_for(&meta.id);
+        let action = self.compose.up(&project).await?;
+        Ok(ApplicationInstallResult {
+            instance_id,
+            action,
+        })
     }
 
     pub async fn start_application(&self, instance_id: &str) -> AppResult<DockerActionResponse> {
@@ -422,16 +577,16 @@ impl ApplicationManager {
         self.compose.ensure_available().await?;
 
         let instance_id = Self::parse_instance_id(instance_id)?;
-        let meta = self.load_instance_meta(&instance_id)?;
-        let project = self.compose_project_for(&instance_id, &meta.project_name);
+        self.load_instance_meta(&instance_id)?;
+        let project = self.compose_project_for(&instance_id);
         self.compose.start(&project).await
     }
 
     pub async fn stop_application(&self, instance_id: &str) -> AppResult<DockerActionResponse> {
         self.compose.ensure_available().await?;
         let instance_id = Self::parse_instance_id(instance_id)?;
-        let meta = self.load_instance_meta(&instance_id)?;
-        let project = self.compose_project_for(&instance_id, &meta.project_name);
+        self.load_instance_meta(&instance_id)?;
+        let project = self.compose_project_for(&instance_id);
         self.compose.stop(&project).await
     }
 
@@ -442,8 +597,8 @@ impl ApplicationManager {
     ) -> AppResult<DockerActionResponse> {
         self.compose.ensure_available().await?;
         let instance_id = Self::parse_instance_id(instance_id)?;
-        let meta = self.load_instance_meta(&instance_id)?;
-        let project = self.compose_project_for(&instance_id, &meta.project_name);
+        self.load_instance_meta(&instance_id)?;
+        let project = self.compose_project_for(&instance_id);
 
         let result = self.compose.down(&project, force).await?;
         let _ = self.delete_instance_dir(&instance_id);
@@ -464,10 +619,8 @@ impl ApplicationManager {
     ) -> AppResult<HashMap<String, String>> {
         let mut out = HashMap::<String, String>::new();
 
-        if let Some(vals) = &req.values {
-            for (k, v) in vals {
-                out.insert(k.clone(), v.clone());
-            }
+        for (k, v) in &req.typed_values {
+            out.insert(k.clone(), Self::typed_value_to_string(v));
         }
 
         for p in &template.params {
@@ -477,8 +630,40 @@ impl ApplicationManager {
                 .or_else(|| p.default_value.clone().filter(|s| !s.trim().is_empty()));
 
             match final_value {
-                Some(v) => {
-                    out.insert(p.key.clone(), v);
+                Some(raw) => {
+                    let normalized = match p.input {
+                        InputType::Boolean => {
+                            Self::normalize_boolean_string(&raw).ok_or_else(|| {
+                                AppError::Validation(format!(
+                                    "Parameter '{}' must be a boolean value",
+                                    p.key
+                                ))
+                            })?
+                        }
+                        InputType::Number => {
+                            let trimmed = raw.trim();
+                            if trimmed.parse::<f64>().is_err() {
+                                return Err(AppError::Validation(format!(
+                                    "Parameter '{}' must be a number",
+                                    p.key
+                                )));
+                            }
+                            trimmed.to_string()
+                        }
+                        InputType::Select => {
+                            if !p.options.is_empty() && !p.options.iter().any(|opt| opt == &raw) {
+                                return Err(AppError::Validation(format!(
+                                    "Parameter '{}' must be one of: {}",
+                                    p.key,
+                                    p.options.join(", ")
+                                )));
+                            }
+                            raw
+                        }
+                        _ => raw,
+                    };
+
+                    out.insert(p.key.clone(), normalized);
                 }
                 None if p.required => {
                     return Err(AppError::Validation(format!(
@@ -516,12 +701,19 @@ impl ApplicationManager {
         let configured = req.port_bindings.clone().unwrap_or_default();
         let mut out = HashMap::new();
 
+        let mut known_template_keys = HashSet::<String>::new();
+        let mut known_template_endpoints = HashSet::<String>::new();
+
         for p in &template.ports {
             let proto = Self::normalize_protocol(&p.protocol);
-            let endpoint = format!("{}/{}", p.container_port, proto);
+            let endpoint = format!("{}/{}", p.container_port, proto).to_ascii_lowercase();
+
+            known_template_keys.insert(p.key.to_ascii_lowercase());
+            known_template_endpoints.insert(endpoint.clone());
 
             let by_key = configured.get(&p.key).copied();
-            let selected = by_key.or(p.default_host_port);
+            let by_endpoint = configured.get(&endpoint).copied();
+            let selected = by_key.or(by_endpoint).or(p.default_host_port);
 
             match selected {
                 Some(port) if port > 0 => {
@@ -537,7 +729,63 @@ impl ApplicationManager {
             }
         }
 
+        for (binding_key, host_port) in &configured {
+            if *host_port == 0 {
+                continue;
+            }
+
+            let normalized_key = binding_key.trim().to_ascii_lowercase();
+
+            if known_template_keys.contains(&normalized_key)
+                || known_template_endpoints.contains(&normalized_key)
+            {
+                continue;
+            }
+
+            let endpoint =
+                Self::normalize_endpoint_binding_key(&normalized_key).ok_or_else(|| {
+                    AppError::Validation(format!(
+                        "Port binding key '{}' must be either a template key or '<container_port>/tcp|udp'",
+                        binding_key
+                    ))
+                })?;
+
+            out.insert(endpoint, *host_port);
+        }
+
         Ok(out)
+    }
+
+    fn build_resolved_install_config(
+        &self,
+        template: &ApplicationTemplate,
+        instance_id: Uuid,
+        instance_name: &str,
+        resolved_values: &HashMap<String, String>,
+        resolved_ports: &HashMap<String, u16>,
+        resolved_env: &HashMap<String, String>,
+    ) -> ApplicationResolvedInstallConfig {
+        let mut values = Vec::<ApplicationResolvedValue>::new();
+        for p in &template.params {
+            if let Some(value) = resolved_values.get(&p.key) {
+                values.push(ApplicationResolvedValue {
+                    key: p.key.clone(),
+                    input: p.input.clone(),
+                    value: value.clone(),
+                });
+            }
+        }
+
+        values.sort_by(|a, b| a.key.cmp(&b.key));
+
+        ApplicationResolvedInstallConfig {
+            template_id: template.id.clone(),
+            instance_id,
+            instance_name: instance_name.to_string(),
+            values,
+            port_bindings: resolved_ports.clone(),
+            env: resolved_env.clone(),
+        }
     }
 
     fn generate_env_file(
@@ -547,7 +795,7 @@ impl ApplicationManager {
         resolved_ports: &HashMap<String, u16>,
         instance_dir: &Path,
         env_overrides: Option<&[String]>,
-    ) -> AppResult<()> {
+    ) -> AppResult<HashMap<String, String>> {
         let mut env_map = HashMap::new();
 
         // 1. Standard Magic Variables (1Panel compatible)
@@ -593,24 +841,23 @@ impl ApplicationManager {
         // Write to .env file
         let env_path = instance_dir.join(".env");
         let mut content = String::new();
-        for (k, v) in env_map {
+        let mut entries = env_map.iter().collect::<Vec<_>>();
+        entries.sort_by(|a, b| a.0.cmp(b.0));
+        for (k, v) in entries {
             content.push_str(&format!("{}={}\n", k, v));
         }
 
         fs::write(&env_path, content)
             .map_err(|e| AppError::System(format!("Failed to write .env file: {}", e)))?;
 
-        Ok(())
+        Ok(env_map)
     }
 
     fn build_tera_context(
         &self,
-        template: &ApplicationTemplate,
         resolved_values: &HashMap<String, String>,
-        resolved_ports: &HashMap<String, u16>,
         instance_name: &str,
         instance_id: &Uuid,
-        image: &str,
         env_overrides: Option<&[String]>,
     ) -> Context {
         let mut ctx = Context::new();
@@ -623,22 +870,6 @@ impl ApplicationManager {
         // Built-in variables
         ctx.insert("app_name", instance_name);
         ctx.insert("app_id", &instance_id.to_string());
-        ctx.insert("app_image", image);
-        ctx.insert("image", image);
-
-        // Port context variables: port_80_tcp = 8080, port_http = 8080
-        for (endpoint, host_port) in resolved_ports {
-            let key = format!("port_{}", Self::sanitize_for_fs(endpoint)).to_lowercase();
-            ctx.insert(&key, host_port);
-        }
-        for p in &template.ports {
-            let proto = Self::normalize_protocol(&p.protocol);
-            let endpoint = format!("{}/{}", p.container_port, proto);
-            if let Some(host) = resolved_ports.get(&endpoint) {
-                let key = format!("port_{}", Self::sanitize_for_fs(&p.key)).to_lowercase();
-                ctx.insert(&key, host);
-            }
-        }
 
         // Environment variable overrides
         if let Some(envs) = env_overrides {
@@ -693,7 +924,7 @@ impl ApplicationManager {
             // ---- Explicit [[config_file]] declarations ----
             let mut rendered = Vec::new();
             for cf in &template.config_files {
-                let src = app_dir.join(&cf.template);
+                let src = app_dir.join(&cf.path);
                 if !src.exists() {
                     return Err(AppError::Validation(format!(
                         "Config template '{}' does not exist for app '{}'",
@@ -702,7 +933,7 @@ impl ApplicationManager {
                     )));
                 }
 
-                let dst = instance_dir.join(&cf.target);
+                let dst = instance_dir.join(&cf.path);
                 if let Some(parent) = dst.parent() {
                     fs::create_dir_all(parent).map_err(|e| {
                         AppError::System(format!(
@@ -955,14 +1186,7 @@ impl ApplicationManager {
             })
             .collect::<AppResult<Vec<_>>>()?;
 
-        let config_files: Vec<ApplicationTemplateConfigFile> = doc
-            .config_files
-            .into_iter()
-            .map(|cf| ApplicationTemplateConfigFile {
-                template: cf.template,
-                target: cf.target,
-            })
-            .collect();
+        let config_files = doc.config_files;
 
         let has_conf_templates = !config_files.is_empty();
 
@@ -971,6 +1195,8 @@ impl ApplicationManager {
         } else {
             doc.metadata.version.clone()
         };
+
+        let template_services = self.extract_template_services(&compose_path)?;
 
         Ok(ApplicationTemplate {
             id,
@@ -987,7 +1213,7 @@ impl ApplicationManager {
                 .readme
                 .map(|p| app_dir.join(p).to_string_lossy().to_string()),
             compose_file,
-            image: doc.metadata.image,
+            services: template_services,
             params,
             ports,
             env,
@@ -1022,11 +1248,17 @@ impl ApplicationManager {
         self.instance_dir(instance_id).join(META_FILE_NAME)
     }
 
+    fn instance_resolved_config_file(&self, instance_id: &Uuid) -> PathBuf {
+        self.instance_dir(instance_id)
+            .join(RESOLVED_CONFIG_FILE_NAME)
+    }
+
     fn write_instance_files(
         &self,
         instance_id: &Uuid,
         compose_yaml: &str,
         meta: &ApplicationInstanceMeta,
+        resolved_config: &ApplicationResolvedInstallConfig,
     ) -> AppResult<()> {
         let dir = self.instance_dir(instance_id);
         fs::create_dir_all(&dir).map_err(|e| {
@@ -1058,6 +1290,22 @@ impl ApplicationManager {
             AppError::System(format!(
                 "Failed to write metadata file '{}': {}",
                 meta_file.display(),
+                e
+            ))
+        })?;
+
+        let resolved_file = self.instance_resolved_config_file(instance_id);
+        let resolved_raw = serde_json::to_string_pretty(resolved_config).map_err(|e| {
+            AppError::System(format!(
+                "Failed to serialize resolved config for instance '{}': {}",
+                instance_id, e
+            ))
+        })?;
+
+        fs::write(&resolved_file, resolved_raw).map_err(|e| {
+            AppError::System(format!(
+                "Failed to write resolved config file '{}': {}",
+                resolved_file.display(),
                 e
             ))
         })?;
@@ -1139,10 +1387,10 @@ impl ApplicationManager {
         })
     }
 
-    fn compose_project_for(&self, instance_id: &Uuid, project_name: &str) -> ComposeProject {
+    fn compose_project_for(&self, instance_id: &Uuid) -> ComposeProject {
         ComposeProject {
             compose_file: self.instance_compose_file(instance_id),
-            project_name: project_name.to_string(),
+            project_name: format!("mana-{}", instance_id),
         }
     }
 
@@ -1152,14 +1400,39 @@ impl ApplicationManager {
         statuses: &[ComposeContainerStatus],
     ) -> ApplicationInstance {
         let mut ports = Vec::<ApplicationPort>::new();
+        let mut services_by_name = BTreeMap::<String, ApplicationInstanceService>::new();
+
         for st in statuses {
+            let service_name = if st.service.trim().is_empty() {
+                st.name.clone()
+            } else {
+                st.service.clone()
+            };
+
+            let service_state = Self::normalize_instance_state(&st.state);
+            let service_entry = services_by_name
+                .entry(service_name.clone())
+                .or_insert_with(|| ApplicationInstanceService {
+                    name: service_name.clone(),
+                    container_name: st.name.clone(),
+                    state: service_state.clone(),
+                    health: st.health.clone(),
+                    ports: Vec::new(),
+                });
+
+            service_entry.container_name = st.name.clone();
+            service_entry.state = service_state;
+            service_entry.health = st.health.clone();
+
             for p in &st.publishers {
-                ports.push(ApplicationPort {
+                let mapped = ApplicationPort {
                     ip: "0.0.0.0".to_string(),
                     private_port: p.target_port.unwrap_or_default(),
                     public_port: p.published_port,
                     protocol: p.protocol.clone().unwrap_or_else(|| "tcp".to_string()),
-                });
+                };
+                ports.push(mapped.clone());
+                service_entry.ports.push(mapped);
             }
         }
 
@@ -1169,18 +1442,26 @@ impl ApplicationManager {
                 .cmp(&b.public_port.unwrap_or_default())
         });
 
-        let primary_state = statuses
-            .first()
-            .map(|s| s.state.as_str())
-            .unwrap_or("exited");
+        let mut services = services_by_name.into_values().collect::<Vec<_>>();
+        services.sort_by(|a, b| a.name.cmp(&b.name));
+        for svc in &mut services {
+            svc.ports.sort_by(|a, b| {
+                a.public_port
+                    .unwrap_or_default()
+                    .cmp(&b.public_port.unwrap_or_default())
+            });
+        }
+
+        let aggregated_state = Self::aggregate_instance_state(&services);
 
         ApplicationInstance {
             id: meta.id.clone(),
             name: meta.name.clone(),
             template_id: meta.template_id.clone(),
             category: meta.category.clone(),
-            state: Self::normalize_instance_state(primary_state),
+            state: aggregated_state,
             ports,
+            services,
         }
     }
 
@@ -1195,26 +1476,88 @@ impl ApplicationManager {
         }
     }
 
+    fn aggregate_instance_state(services: &[ApplicationInstanceService]) -> String {
+        if services.is_empty() {
+            return "exited".to_string();
+        }
+
+        let has_running = services.iter().any(|s| s.state == "running");
+        let has_restarting = services.iter().any(|s| s.state == "restarting");
+        let has_created = services.iter().any(|s| s.state == "created");
+        let has_paused = services.iter().any(|s| s.state == "paused");
+        let has_dead = services.iter().any(|s| s.state == "dead");
+
+        if has_running {
+            return "running".to_string();
+        }
+        if has_restarting {
+            return "restarting".to_string();
+        }
+        if has_created {
+            return "created".to_string();
+        }
+        if has_paused {
+            return "paused".to_string();
+        }
+        if has_dead {
+            return "dead".to_string();
+        }
+
+        "exited".to_string()
+    }
+
+    fn extract_template_services(
+        &self,
+        compose_path: &Path,
+    ) -> AppResult<Vec<ApplicationTemplateService>> {
+        let raw = fs::read_to_string(compose_path).map_err(|e| {
+            AppError::System(format!(
+                "Failed to read compose template '{}': {}",
+                compose_path.display(),
+                e
+            ))
+        })?;
+
+        let value: serde_yaml::Value = serde_yaml::from_str(&raw).map_err(|e| {
+            AppError::Validation(format!(
+                "Invalid compose template '{}': {}",
+                compose_path.display(),
+                e
+            ))
+        })?;
+
+        let services_value = value
+            .as_mapping()
+            .and_then(|m| m.get(&serde_yaml::Value::String("services".to_string())))
+            .and_then(|v| v.as_mapping());
+
+        let mut services = Vec::<ApplicationTemplateService>::new();
+        if let Some(mapping) = services_value {
+            for (k, v) in mapping {
+                let Some(name) = k.as_str() else {
+                    continue;
+                };
+
+                let image = v
+                    .as_mapping()
+                    .and_then(|m| m.get(&serde_yaml::Value::String("image".to_string())))
+                    .and_then(|img| img.as_str())
+                    .map(|s| s.to_string());
+
+                services.push(ApplicationTemplateService {
+                    name: name.to_string(),
+                    image,
+                });
+            }
+        }
+
+        services.sort_by(|a, b| a.name.cmp(&b.name));
+        Ok(services)
+    }
+
     fn render_tera_template(template_str: &str, ctx: &Context) -> AppResult<String> {
         Tera::one_off(template_str, ctx, false)
             .map_err(|e| AppError::System(format!("Template render failed: {}", e)))
-    }
-
-    fn sanitize_for_fs(raw: &str) -> String {
-        let mut out = String::with_capacity(raw.len());
-        for ch in raw.chars() {
-            if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
-                out.push(ch);
-            } else {
-                out.push('_');
-            }
-        }
-        let trimmed = out.trim_matches('_');
-        if trimmed.is_empty() {
-            "app".to_string()
-        } else {
-            trimmed.to_string()
-        }
     }
 
     fn normalize_protocol(input: &str) -> String {
@@ -1222,6 +1565,52 @@ impl ApplicationManager {
             "udp".to_string()
         } else {
             "tcp".to_string()
+        }
+    }
+
+    fn normalize_endpoint_binding_key(input: &str) -> Option<String> {
+        let (port_raw, proto_raw) = input.split_once('/')?;
+        let port = port_raw.trim().parse::<u16>().ok()?;
+        if port == 0 {
+            return None;
+        }
+
+        let proto = Self::normalize_protocol(proto_raw);
+        Some(format!("{}/{}", port, proto))
+    }
+
+    fn typed_value_to_string(value: &ApplicationInstallValue) -> String {
+        match value {
+            ApplicationInstallValue::String(v) => v.clone(),
+            ApplicationInstallValue::Integer(v) => v.to_string(),
+            ApplicationInstallValue::Float(v) => {
+                let mut s = v.to_string();
+                if s.contains('.') {
+                    while s.ends_with('0') {
+                        s.pop();
+                    }
+                    if s.ends_with('.') {
+                        s.push('0');
+                    }
+                }
+                s
+            }
+            ApplicationInstallValue::Boolean(v) => {
+                if *v {
+                    "true".to_string()
+                } else {
+                    "false".to_string()
+                }
+            }
+        }
+    }
+
+    fn normalize_boolean_string(raw: &str) -> Option<String> {
+        let normalized = raw.trim().to_ascii_lowercase();
+        match normalized.as_str() {
+            "true" | "1" | "yes" | "on" => Some("true".to_string()),
+            "false" | "0" | "no" | "off" => Some("false".to_string()),
+            _ => None,
         }
     }
 
@@ -1259,5 +1648,94 @@ impl ApplicationManager {
                 raw
             ))
         })
+    }
+}
+
+fn collect_template_images(manager: &ApplicationManager, template_id: &str) -> Vec<String> {
+    let mut images = BTreeSet::<String>::new();
+
+    if let Some(template) = manager
+        .list_templates()
+        .into_iter()
+        .find(|tpl| tpl.id == template_id)
+    {
+        for svc in template.services {
+            let Some(raw) = svc.image else {
+                continue;
+            };
+            let normalized = raw.trim();
+            if !normalized.is_empty() {
+                images.insert(normalized.to_string());
+            }
+        }
+    }
+
+    images.into_iter().collect()
+}
+
+fn format_pull_progress_line(image: &str, item: PullProgress) -> String {
+    let mut parts = Vec::<String>::new();
+
+    let status = item.status.trim();
+    if !status.is_empty() {
+        parts.push(status.to_string());
+    }
+
+    if let Some(id) = item
+        .id
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+    {
+        parts.push(format!("layer={}", id));
+    }
+
+    if let Some(progress) = item
+        .progress
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+    {
+        parts.push(progress);
+    }
+
+    if parts.is_empty() {
+        format!("[pull:{}] update", image)
+    } else {
+        format!("[pull:{}] {}", image, parts.join(" | "))
+    }
+}
+
+async fn stream_image_pull_progress(
+    docker: DockerService,
+    task_manager: ApplicationTaskManager,
+    task_id: String,
+    image: String,
+) -> AppResult<()> {
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<PullProgress>(128);
+    let docker_for_pull = docker.clone();
+    let image_for_pull = image.clone();
+
+    let pull_handle =
+        tokio::spawn(async move { docker_for_pull.pull_image_stream(&image_for_pull, tx).await });
+
+    let mut last_line = String::new();
+    while let Some(item) = rx.recv().await {
+        let line = format_pull_progress_line(&image, item);
+        if line == last_line {
+            continue;
+        }
+        last_line = line.clone();
+
+        let _ = task_manager
+            .append_log(&task_id, ApplicationTaskLogLevel::Info, line)
+            .await;
+    }
+
+    match pull_handle.await {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(err)) => Err(err),
+        Err(err) => Err(AppError::System(format!(
+            "Image pull worker crashed for '{}': {}",
+            image, err
+        ))),
     }
 }

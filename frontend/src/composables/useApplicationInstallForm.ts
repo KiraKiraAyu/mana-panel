@@ -1,6 +1,7 @@
 import { computed, ref, watch, type Ref } from 'vue'
 
 import type {
+    ApplicationInstallValue,
     ApplicationTemplate,
     ApplicationTemplateParam,
 } from '@/api/applications'
@@ -10,6 +11,8 @@ export interface InstallFormState {
     name: string
     values: Record<string, string>
     port_bindings: Record<string, number | undefined>
+    extra_port_bindings: Record<string, number | undefined>
+    env_overrides: Record<string, string>
 }
 
 export interface InstallPortField {
@@ -32,6 +35,8 @@ const createInitialFormState = (): InstallFormState => ({
     name: '',
     values: {},
     port_bindings: {},
+    extra_port_bindings: {},
+    env_overrides: {},
 })
 
 export function useApplicationInstallForm(
@@ -135,6 +140,48 @@ export function useApplicationInstallForm(
             }
         }
 
+        for (const [endpoint, raw] of Object.entries(
+            form.value.extra_port_bindings,
+        )) {
+            const endpointNormalized = String(endpoint).trim().toLowerCase()
+            if (!/^\d+\/(tcp|udp)$/.test(endpointNormalized)) {
+                errors.push(
+                    `Custom port key "${endpoint}" must match "<containerPort>/tcp|udp"`,
+                )
+                continue
+            }
+
+            const configured = Number(raw)
+            const hasConfigured =
+                Number.isInteger(configured) &&
+                configured >= 1 &&
+                configured <= 65535
+
+            if (
+                raw !== undefined &&
+                raw !== null &&
+                raw !== ('' as unknown as number) &&
+                !hasConfigured
+            ) {
+                errors.push(
+                    `Custom host port for ${endpoint} must be between 1 and 65535`,
+                )
+            }
+        }
+
+        for (const [key, value] of Object.entries(form.value.env_overrides)) {
+            const envKey = String(key).trim()
+            if (!envKey) continue
+            if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(envKey)) {
+                errors.push(`Environment variable name "${key}" is invalid`)
+            }
+            if (String(value ?? '').includes('\n')) {
+                errors.push(
+                    `Environment variable "${key}" cannot contain new lines`,
+                )
+            }
+        }
+
         return errors
     })
 
@@ -165,23 +212,30 @@ export function useApplicationInstallForm(
             options.installStatusMessage.value = ''
     }
 
-    const buildValues = (): Record<string, string> | undefined => {
-        const out: Record<string, string> = {}
+    const buildTypedValues = ():
+        | Record<string, ApplicationInstallValue>
+        | undefined => {
+        const out: Record<string, ApplicationInstallValue> = {}
 
         for (const p of paramFields.value) {
             const raw = form.value.values[p.key]
             if (raw === undefined || raw === null) continue
 
+            const rawString = String(raw).trim()
+            if (!rawString && p.input !== 'boolean') continue
+
             if (p.input === 'boolean') {
-                out[p.key] =
-                    String(raw).trim().toLowerCase() === 'true'
-                        ? 'true'
-                        : 'false'
+                out[p.key] = rawString.toLowerCase() === 'true'
                 continue
             }
 
-            const trimmed = String(raw).trim()
-            if (trimmed) out[p.key] = trimmed
+            if (p.input === 'number') {
+                const n = Number(rawString)
+                if (Number.isFinite(n)) out[p.key] = n
+                continue
+            }
+
+            out[p.key] = rawString
         }
 
         return Object.keys(out).length ? out : undefined
@@ -204,7 +258,37 @@ export function useApplicationInstallForm(
             if (p.default_host_port) out[p.key] = p.default_host_port
         }
 
+        for (const [endpoint, raw] of Object.entries(
+            form.value.extra_port_bindings,
+        )) {
+            const endpointNormalized = String(endpoint).trim().toLowerCase()
+            const configured = Number(raw)
+            if (
+                /^\d+\/(tcp|udp)$/.test(endpointNormalized) &&
+                Number.isInteger(configured) &&
+                configured >= 1 &&
+                configured <= 65535
+            ) {
+                out[endpointNormalized] = configured
+            }
+        }
+
         return Object.keys(out).length ? out : undefined
+    }
+
+    const buildEnvOverrides = (): string[] | undefined => {
+        const out: string[] = []
+
+        for (const [key, value] of Object.entries(form.value.env_overrides)) {
+            const k = String(key).trim()
+            if (!k) continue
+            if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(k)) continue
+
+            const v = String(value ?? '').trim()
+            out.push(`${k}=${v}`)
+        }
+
+        return out.length ? out : undefined
     }
 
     return {
@@ -217,7 +301,8 @@ export function useApplicationInstallForm(
         canSubmit,
         openInstallModal,
         closeInstallModal,
-        buildValues,
+        buildTypedValues,
         buildPortBindings,
+        buildEnvOverrides,
     }
 }

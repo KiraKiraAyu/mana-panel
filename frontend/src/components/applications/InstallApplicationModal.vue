@@ -148,6 +148,142 @@
                             </div>
                         </div>
 
+                        <div class="space-y-4">
+                            <h3
+                                class="text-sm font-semibold uppercase tracking-wider text-text-secondary border-b border-border pb-2"
+                            >
+                                Custom Port Mappings
+                            </h3>
+
+                            <div class="space-y-3">
+                                <div
+                                    v-if="
+                                        Object.keys(
+                                            form.extra_port_bindings || {},
+                                        ).length === 0
+                                    "
+                                    class="text-xs text-text-muted"
+                                >
+                                    No custom port mappings. Add endpoint-based
+                                    mappings like
+                                    <span class="font-mono"
+                                        >8081/tcp → 18081</span
+                                    >.
+                                </div>
+
+                                <div
+                                    v-for="endpoint in Object.keys(
+                                        form.extra_port_bindings || {},
+                                    )"
+                                    :key="`custom-port-${endpoint}`"
+                                    class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr_auto] gap-2 items-center"
+                                >
+                                    <input
+                                        :value="endpoint"
+                                        @input="
+                                            renameCustomPortEndpoint(
+                                                endpoint,
+                                                $event,
+                                            )
+                                        "
+                                        placeholder="8081/tcp"
+                                        class="input w-full bg-background border-border focus:border-reisa-lilac-500 rounded-lg font-mono text-sm"
+                                    />
+                                    <span
+                                        class="text-xs text-text-muted text-center"
+                                        >→</span
+                                    >
+                                    <input
+                                        v-model.number="
+                                            form.extra_port_bindings[endpoint]
+                                        "
+                                        type="number"
+                                        min="1"
+                                        max="65535"
+                                        placeholder="18081"
+                                        class="input w-full bg-background border-border focus:border-reisa-lilac-500 rounded-lg font-mono text-sm"
+                                    />
+                                    <button
+                                        type="button"
+                                        class="btn btn-ghost btn-sm text-error hover:bg-error/10"
+                                        @click="
+                                            removeCustomPortEndpoint(endpoint)
+                                        "
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    class="btn btn-sm btn-ghost border border-border hover:border-reisa-lilac-500/40"
+                                    @click="addCustomPortBinding"
+                                >
+                                    + Add Custom Port Mapping
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4">
+                            <h3
+                                class="text-sm font-semibold uppercase tracking-wider text-text-secondary border-b border-border pb-2"
+                            >
+                                Environment Overrides
+                            </h3>
+
+                            <div class="space-y-3">
+                                <div
+                                    v-if="
+                                        Object.keys(form.env_overrides || {})
+                                            .length === 0
+                                    "
+                                    class="text-xs text-text-muted"
+                                >
+                                    No environment overrides. Add values like
+                                    <span class="font-mono"
+                                        >TZ=Asia/Shanghai</span
+                                    >.
+                                </div>
+
+                                <div
+                                    v-for="envKey in Object.keys(
+                                        form.env_overrides || {},
+                                    )"
+                                    :key="`env-override-${envKey}`"
+                                    class="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-2 items-center"
+                                >
+                                    <input
+                                        :value="envKey"
+                                        @input="
+                                            renameEnvOverrideKey(envKey, $event)
+                                        "
+                                        placeholder="ENV_NAME"
+                                        class="input w-full bg-background border-border focus:border-reisa-lilac-500 rounded-lg font-mono text-sm"
+                                    />
+                                    <input
+                                        v-model="form.env_overrides[envKey]"
+                                        placeholder="value"
+                                        class="input w-full bg-background border-border focus:border-reisa-lilac-500 rounded-lg font-mono text-sm"
+                                    />
+                                    <button
+                                        type="button"
+                                        class="btn btn-ghost btn-sm text-error hover:bg-error/10"
+                                        @click="removeEnvOverride(envKey)"
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    class="btn btn-sm btn-ghost border border-border hover:border-reisa-lilac-500/40"
+                                    @click="addEnvOverride"
+                                >
+                                    + Add Environment Override
+                                </button>
+                            </div>
+                        </div>
+
                         <div v-if="paramFields.length" class="space-y-4">
                             <h3
                                 class="text-sm font-semibold uppercase tracking-wider text-text-secondary border-b border-border pb-2"
@@ -374,6 +510,8 @@ export interface InstallFormState {
     name: string
     values: Record<string, string>
     port_bindings: Record<string, number | undefined>
+    extra_port_bindings: Record<string, number | undefined>
+    env_overrides: Record<string, string>
 }
 
 export interface InstallPortField {
@@ -400,6 +538,84 @@ defineEmits<{
     (e: 'close'): void
     (e: 'submit'): void
 }>()
+
+const ensureCustomPortBindings = () => {
+    if (!props.form.extra_port_bindings) {
+        props.form.extra_port_bindings = {}
+    }
+}
+
+const ensureEnvOverrides = () => {
+    if (!props.form.env_overrides) {
+        props.form.env_overrides = {}
+    }
+}
+
+const addCustomPortBinding = () => {
+    ensureCustomPortBindings()
+
+    let i = 0
+    let candidate = '8081/tcp'
+    while (props.form.extra_port_bindings[candidate] !== undefined) {
+        i += 1
+        candidate = `${8081 + i}/tcp`
+    }
+
+    props.form.extra_port_bindings[candidate] = undefined
+}
+
+const removeCustomPortEndpoint = (endpoint: string) => {
+    ensureCustomPortBindings()
+    delete props.form.extra_port_bindings[endpoint]
+}
+
+const renameCustomPortEndpoint = (oldKey: string, event: Event) => {
+    ensureCustomPortBindings()
+
+    const target = event.target as HTMLInputElement
+    const nextKey = target.value.trim().toLowerCase()
+    if (nextKey === oldKey) return
+
+    const currentValue = props.form.extra_port_bindings[oldKey]
+    delete props.form.extra_port_bindings[oldKey]
+
+    if (nextKey) {
+        props.form.extra_port_bindings[nextKey] = currentValue
+    }
+}
+
+const addEnvOverride = () => {
+    ensureEnvOverrides()
+
+    let i = 0
+    let candidate = 'NEW_ENV'
+    while (props.form.env_overrides[candidate] !== undefined) {
+        i += 1
+        candidate = `NEW_ENV_${i}`
+    }
+
+    props.form.env_overrides[candidate] = ''
+}
+
+const removeEnvOverride = (key: string) => {
+    ensureEnvOverrides()
+    delete props.form.env_overrides[key]
+}
+
+const renameEnvOverrideKey = (oldKey: string, event: Event) => {
+    ensureEnvOverrides()
+
+    const target = event.target as HTMLInputElement
+    const nextKey = target.value.trim()
+    if (nextKey === oldKey) return
+
+    const currentValue = props.form.env_overrides[oldKey]
+    delete props.form.env_overrides[oldKey]
+
+    if (nextKey) {
+        props.form.env_overrides[nextKey] = currentValue ?? ''
+    }
+}
 
 const resolveInputType = (input: string): string => {
     if (input === 'password') return 'password'

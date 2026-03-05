@@ -9,6 +9,15 @@
             @refresh="refreshAll"
         />
 
+        <div class="flex justify-end">
+            <RouterLink
+                to="/applications/tasks"
+                class="btn btn-sm btn-ghost border border-border hover:border-reisa-lilac-500/40 text-text-secondary hover:text-text-primary"
+            >
+                View Task Output
+            </RouterLink>
+        </div>
+
         <ApplicationTabs
             :active-tab="activeTab"
             :installed-count="instances.length"
@@ -110,6 +119,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { RouterLink } from 'vue-router'
 
 import {
     applicationsApi,
@@ -152,8 +162,9 @@ const {
     canSubmit,
     openInstallModal,
     closeInstallModal,
-    buildValues,
+    buildTypedValues,
     buildPortBindings,
+    buildEnvOverrides,
 } = useApplicationInstallForm({
     templates,
     submitting,
@@ -177,21 +188,22 @@ const installApplication = async () => {
         const payload: InstallApplicationRequest = {
             template_id: form.value.template_id,
             name: form.value.name.trim() || undefined,
-            values: buildValues(),
+            typed_values: buildTypedValues(),
             port_bindings: buildPortBindings(),
+            env: buildEnvOverrides(),
         }
 
-        installStatusMessage.value = 'Applying compose project...'
-        const result = await applicationsApi.install(payload)
-
-        installStatusMessage.value = 'Install completed'
-        success.value = result.action?.message || 'Application installed'
+        // Close immediately after submit; task output is tracked in dedicated task view.
         installModalOpen.value = false
-        activeTab.value = 'installed'
-        await refreshAll()
+        installStatusMessage.value = ''
+
+        const task = await applicationsApi.install(payload)
+        success.value = `Install task ${task.id.slice(0, 8)} created. Open "View Task Output" to monitor.`
     } catch (e: any) {
         error.value =
-            e.response?.data?.error?.message || 'Failed to install application'
+            e?.message ||
+            e.response?.data?.error?.message ||
+            'Failed to install application'
     } finally {
         submitting.value = false
     }

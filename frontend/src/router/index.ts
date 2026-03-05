@@ -41,6 +41,11 @@ const router = createRouter({
                     component: () => import('@/views/ApplicationView.vue'),
                 },
                 {
+                    path: 'applications/tasks',
+                    name: 'application-tasks',
+                    component: () => import('@/views/ApplicationTasksView.vue'),
+                },
+                {
                     path: 'docker',
                     name: 'docker',
                     component: () => import('@/views/DockerView.vue'),

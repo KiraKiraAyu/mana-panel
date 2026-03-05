@@ -6,7 +6,6 @@ category = "proxy"
 description = "Minimal Caddy reverse proxy with automatic HTTPS. Advanced routing and policies will be managed in Website features."
 readme = "README.md"
 compose_file = "docker-compose.yml"
-image = "caddy:2-alpine"
 
 [[param]]
 key = "domain"
@@ -61,5 +60,4 @@ required = true
 env_key = "PANEL_APP_PORT_HTTPS"
 
 [[config_file]]
-template = "conf/Caddyfile.tera"
-target = "conf/Caddyfile"
+path = "conf/Caddyfile"

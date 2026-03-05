@@ -72,7 +72,7 @@
                                 {{ app.state }}
                             </span>
                         </h3>
-                        <p class="text-xs text-text-muted truncate mt-0.5">
+                        <p class="text-xs text-text-muted mt-0.5">
                             <span class="font-mono">{{ app.template_id }}</span>
                             <span class="mx-1.5 opacity-50">|</span>
                             <span
@@ -91,6 +91,45 @@
                             </span>
                             <span v-else>Internal Only</span>
                         </p>
+
+                        <div
+                            v-if="app.services?.length"
+                            class="mt-2 space-y-1.5"
+                        >
+                            <div
+                                v-for="svc in app.services"
+                                :key="`${app.id}-${svc.name}`"
+                                class="flex flex-wrap items-center gap-2 text-[11px]"
+                            >
+                                <span class="font-mono text-text-secondary">{{
+                                    svc.name
+                                }}</span>
+                                <span
+                                    class="px-1.5 py-0.5 rounded border"
+                                    :class="
+                                        svc.state === 'running'
+                                            ? 'bg-success/10 text-success border-success/20'
+                                            : 'bg-surface-secondary text-text-muted border-border'
+                                    "
+                                >
+                                    {{ svc.state }}
+                                </span>
+                                <span class="text-text-muted">·</span>
+                                <span class="text-text-muted">
+                                    {{
+                                        svc.ports.length
+                                            ? svc.ports
+                                                  .map((p) =>
+                                                      p.public_port
+                                                          ? `${p.public_port}→${p.private_port}`
+                                                          : `${p.private_port}`,
+                                                  )
+                                                  .join(', ')
+                                            : 'Internal Only'
+                                    }}
+                                </span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

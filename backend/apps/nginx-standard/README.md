@@ -17,7 +17,7 @@ advanced routing, SSL certificate lifecycle, WAF, path rules, and policy details
 | Key | Type | Required | Default | Description |
 |---|---|---:|---|---|
 | `server_name` | text | ✅ | `_` | Nginx `server_name` value (use `_` as catch-all) |
-| `proxy_url` | text | ✅ | `http://host.docker.internal:3000` | Upstream target URL |
+| `proxy_url` | text | ❌ | (empty) | Optional upstream target URL; empty means static-only hosting |
 
 ## Ports
 
@@ -30,19 +30,25 @@ advanced routing, SSL certificate lifecycle, WAF, path rules, and policy details
 At install time, Mana Panel renders and writes:
 
 - `conf/nginx.conf`
-- `conf/default/default.conf`
+- `conf/sites-available/default.conf`
+- `conf/sites-enabled/default.conf`
+- `conf/includes/http/upgrade_map.conf`
+- `conf/includes/http/proxy_base.conf`
+- `conf/includes/server/base.conf`
 
 Then Docker Compose mounts them into the container.
 
 ## Behavior
 
-The generated site config is intentionally minimal:
+The generated gateway config keeps `nginx.conf` minimally invasive and delegates reusable policy via `include` files:
 
 - Listens on port `80`
 - Matches `server_name`
-- Proxies `/` to `proxy_url`
-- Adds basic proxy headers (`Host`, `X-Real-IP`, `X-Forwarded-*`)
-- Enables WebSocket upgrade headers
+- Uses Ubuntu-style site layout (`sites-available` + `sites-enabled`)
+- With `proxy_url` set: tries local static files first, then proxies to upstream
+- With empty `proxy_url`: serves static files only and returns `404` for missing paths
+- Provides `/healthz` endpoint
+- Uses shared include snippets for proxy headers, WebSocket upgrade, and basic timeout policy
 
 ## Notes
 

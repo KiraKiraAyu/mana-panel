@@ -30,8 +30,12 @@ export interface ApplicationTemplateEnv {
 }
 
 export interface ApplicationTemplateConfigFile {
-    template: string
-    target: string
+    path: string
+}
+
+export interface ApplicationTemplateService {
+    name: string
+    image: string | null
 }
 
 export interface ApplicationTemplate {
@@ -43,6 +47,7 @@ export interface ApplicationTemplate {
     icon_path: string | null
     readme_path: string | null
     compose_file: string
+    services: ApplicationTemplateService[]
     params: ApplicationTemplateParam[]
     ports: ApplicationTemplatePort[]
     env: ApplicationTemplateEnv[]
@@ -58,6 +63,14 @@ export interface ApplicationPort {
     protocol: string
 }
 
+export interface ApplicationInstanceService {
+    name: string
+    container_name: string
+    state: string
+    health: string | null
+    ports: ApplicationPort[]
+}
+
 export interface ApplicationInstance {
     id: string
     name: string
@@ -65,14 +78,16 @@ export interface ApplicationInstance {
     category: string
     state: string
     ports: ApplicationPort[]
+    services: ApplicationInstanceService[]
 }
+
+export type ApplicationInstallValue = string | number | boolean
 
 export interface InstallApplicationRequest {
     template_id: string
     name?: string
 
-    // Generic app values (app.toml params)
-    values?: Record<string, string>
+    typed_values?: Record<string, ApplicationInstallValue>
 
     // Host bindings by app.toml [[port]].key => host port
     port_bindings?: Record<string, number>
@@ -85,9 +100,37 @@ export interface DockerActionResponse {
     message: string
 }
 
-export interface InstallApplicationResponse {
-    action: DockerActionResponse
+export type InstallApplicationResponse = ApplicationTask
+
+export type ApplicationTaskStatus =
+    | 'pending'
+    | 'running'
+    | 'succeeded'
+    | 'failed'
+export type ApplicationTaskKind = 'install'
+export type ApplicationTaskLogLevel = 'info' | 'warn' | 'error'
+
+export interface ApplicationTaskLogEntry {
+    at: string
+    level: ApplicationTaskLogLevel
+    message: string
 }
+
+export interface ApplicationTask {
+    id: string
+    kind: ApplicationTaskKind
+    status: ApplicationTaskStatus
+    template_id: string
+    requested_name?: string | null
+    instance_id?: string | null
+    created_at: string
+    started_at?: string | null
+    finished_at?: string | null
+    summary?: string | null
+    logs: ApplicationTaskLogEntry[]
+}
+
+const TASKS_STREAM_URL = '/api/applications/tasks/stream'
 
 export const applicationsApi = {
     async listTemplates(): Promise<ApplicationTemplate[]> {
@@ -105,6 +148,25 @@ export const applicationsApi = {
     ): Promise<InstallApplicationResponse> {
         const response = await api.post('/applications/install', payload)
         return response.data
+    },
+
+    async listTasks(): Promise<ApplicationTask[]> {
+        const response = await api.get('/applications/tasks')
+        return response.data
+    },
+
+    async getTask(taskId: string): Promise<ApplicationTask> {
+        const response = await api.get(`/applications/tasks/${taskId}`)
+        return response.data
+    },
+
+    getTasksStreamUrl(): string {
+        return TASKS_STREAM_URL
+    },
+
+    getTaskStreamUrl(taskId: string): string {
+        const safeTaskId = encodeURIComponent(taskId)
+        return `/api/applications/tasks/${safeTaskId}/stream`
     },
 
     async start(instanceId: string): Promise<DockerActionResponse> {

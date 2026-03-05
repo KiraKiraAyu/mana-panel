@@ -1,14 +1,12 @@
 [metadata]
 id = "nginx-standard"
 name = "Nginx"
-version = "2.1.0"
+version = "2.2.0"
 category = "proxy"
 description = "Minimal Nginx reverse-proxy template. Advanced routing and SSL will be managed by Website features."
 readme = "README.md"
 compose_file = "docker-compose.yml"
-image = "nginx:stable-alpine"
 
-# Minimal reverse-proxy fields
 [[param]]
 key = "server_name"
 label = "Server Name"
@@ -23,11 +21,11 @@ placeholder = "example.com"
 [[param]]
 key = "proxy_url"
 label = "Upstream URL"
-description = "Target upstream URL, e.g. http://host.docker.internal:3000"
-required = true
-default = "http://host.docker.internal:3000"
+description = "Optional upstream URL. Leave empty to serve static files only."
+required = false
+default = ""
 input = "text"
-placeholder = "http://host.docker.internal:3000"
+placeholder = "http://upstream:3000"
 
 [[port]]
 key = "http"
@@ -38,9 +36,19 @@ required = true
 env_key = "PANEL_APP_PORT_HTTP"
 
 [[config_file]]
-template = "conf/nginx.conf"
-target = "conf/nginx.conf"
+path = "conf/nginx.conf"
 
 [[config_file]]
-template = "conf/default/default.conf.tera"
-target = "conf/default/default.conf"
+path = "conf/sites-available/default.conf"
+
+[[config_file]]
+path = "conf/sites-enabled/default.conf"
+
+[[config_file]]
+path = "conf/includes/http/upgrade_map.conf"
+
+[[config_file]]
+path = "conf/includes/http/proxy_base.conf"
+
+[[config_file]]
+path = "conf/includes/server/base.conf"

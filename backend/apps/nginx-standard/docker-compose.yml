@@ -1,11 +1,13 @@
 services:
     app:
-        image: "{{ app_image }}"
+        image: "nginx:stable-alpine"
         container_name: "{{ app_name }}"
         restart: unless-stopped
         ports:
             - "${PANEL_APP_PORT_HTTP}:80/tcp"
         volumes:
             - "./conf/nginx.conf:/etc/nginx/nginx.conf:ro"
-            - "./conf/default:/etc/nginx/conf.d/default:ro"
+            - "./conf/sites-available:/etc/nginx/sites-available:ro"
+            - "./conf/sites-enabled:/etc/nginx/sites-enabled:ro"
+            - "./conf/includes:/etc/nginx/includes:ro"
             - "./log:/var/log/nginx"
