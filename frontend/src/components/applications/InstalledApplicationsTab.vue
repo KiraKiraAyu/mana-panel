@@ -190,6 +190,27 @@
                     <div class="w-px h-4 bg-border mx-1"></div>
 
                     <button
+                        @click="$emit('update', String(app.id))"
+                        title="Update"
+                        class="p-2 text-text-secondary hover:text-reisa-lilac-500 hover:bg-reisa-lilac-500/10 rounded-lg transition-colors"
+                        :disabled="loading"
+                    >
+                        <svg
+                            class="w-4 h-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M4 4v6h6M20 20v-6h-6M20 8a8 8 0 00-13.657-5.657L4 4m16 16l-2.343 2.343A8 8 0 014 16"
+                            />
+                        </svg>
+                    </button>
+
+                    <button
                         @click="$emit('remove', String(app.id), app.name)"
                         title="Remove"
                         class="p-2 text-text-secondary hover:text-error hover:bg-error/10 rounded-lg transition-colors"
@@ -226,6 +247,7 @@ defineProps<{
 defineEmits<{
     (e: 'start', id: string): void
     (e: 'stop', id: string): void
+    (e: 'update', id: string): void
     (e: 'remove', id: string, name: string): void
     (e: 'switchToAvailable'): void
 }>()

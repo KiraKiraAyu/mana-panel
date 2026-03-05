@@ -590,6 +590,38 @@ impl ApplicationManager {
         self.compose.stop(&project).await
     }
 
+    pub async fn update_application(
+        &self,
+        instance_id: &str,
+        docker: Option<DockerService>,
+    ) -> AppResult<DockerActionResponse> {
+        let _guard = app_operation_lock().lock().await;
+        self.compose.ensure_available().await?;
+
+        let instance_id = Self::parse_instance_id(instance_id)?;
+        self.load_instance_meta(&instance_id)?;
+        let project = self.compose_project_for(&instance_id);
+        let images = self.extract_images_from_compose_file(&project.compose_file)?;
+
+        if let Some(docker_service) = docker {
+            for image in &images {
+                docker_service.pull_image(image).await?;
+            }
+        } else if !images.is_empty() {
+            tracing::warn!(
+                "Docker API unavailable, skip pre-pull for application update '{}'",
+                instance_id
+            );
+        }
+
+        let mut action = self.compose.up(&project).await?;
+        if !images.is_empty() {
+            action.message = format!("{} (updated {} image(s))", action.message, images.len());
+        }
+
+        Ok(action)
+    }
+
     pub async fn remove_application(
         &self,
         instance_id: &str,
@@ -1553,6 +1585,47 @@ impl ApplicationManager {
 
         services.sort_by(|a, b| a.name.cmp(&b.name));
         Ok(services)
+    }
+
+    fn extract_images_from_compose_file(&self, compose_path: &Path) -> AppResult<Vec<String>> {
+        let raw = fs::read_to_string(compose_path).map_err(|e| {
+            AppError::System(format!(
+                "Failed to read compose file '{}': {}",
+                compose_path.display(),
+                e
+            ))
+        })?;
+
+        let value: serde_yaml::Value = serde_yaml::from_str(&raw).map_err(|e| {
+            AppError::Validation(format!(
+                "Invalid compose file '{}': {}",
+                compose_path.display(),
+                e
+            ))
+        })?;
+
+        let mut images = BTreeSet::<String>::new();
+        let services = value
+            .as_mapping()
+            .and_then(|m| m.get(&serde_yaml::Value::String("services".to_string())))
+            .and_then(|v| v.as_mapping());
+
+        if let Some(mapping) = services {
+            for (_service_name, service_value) in mapping {
+                let image = service_value
+                    .as_mapping()
+                    .and_then(|m| m.get(&serde_yaml::Value::String("image".to_string())))
+                    .and_then(|img| img.as_str())
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty());
+
+                if let Some(image) = image {
+                    images.insert(image);
+                }
+            }
+        }
+
+        Ok(images.into_iter().collect())
     }
 
     fn render_tera_template(template_str: &str, ctx: &Context) -> AppResult<String> {

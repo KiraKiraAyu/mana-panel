@@ -95,6 +95,7 @@
                 :loading="loading || submitting"
                 @start="startApplication"
                 @stop="stopApplication"
+                @update="updateApplication"
                 @remove="removeApplication"
                 @switch-to-available="activeTab = 'available'"
             />
@@ -149,6 +150,7 @@ const {
     refreshAll,
     startApplication,
     stopApplication,
+    updateApplication,
     removeApplication,
 } = useApplicationsData()
 

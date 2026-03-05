@@ -179,6 +179,11 @@ export const applicationsApi = {
         return response.data
     },
 
+    async update(instanceId: string): Promise<DockerActionResponse> {
+        const response = await api.post(`/applications/${instanceId}/update`)
+        return response.data
+    },
+
     async remove(
         instanceId: string,
         force: boolean = true,

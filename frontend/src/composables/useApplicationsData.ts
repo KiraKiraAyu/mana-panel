@@ -42,7 +42,8 @@ export const useApplicationsData = (
             dockerAvailable.value = true
         } catch (e: any) {
             const message: string =
-                e?.response?.data?.error?.message || 'Failed to load applications'
+                e?.response?.data?.error?.message ||
+                'Failed to load applications'
 
             if (message.toLowerCase().includes('docker is not available')) {
                 dockerAvailable.value = false
@@ -64,7 +65,8 @@ export const useApplicationsData = (
             return true
         } catch (e: any) {
             error.value =
-                e?.response?.data?.error?.message || 'Failed to start application'
+                e?.response?.data?.error?.message ||
+                'Failed to start application'
             return false
         }
     }
@@ -79,7 +81,24 @@ export const useApplicationsData = (
             return true
         } catch (e: any) {
             error.value =
-                e?.response?.data?.error?.message || 'Failed to stop application'
+                e?.response?.data?.error?.message ||
+                'Failed to stop application'
+            return false
+        }
+    }
+
+    const updateApplication = async (id: string) => {
+        clearFeedback()
+
+        try {
+            const result = await applicationsApi.update(id)
+            success.value = result.message || 'Application updated'
+            await refreshAll()
+            return true
+        } catch (e: any) {
+            error.value =
+                e?.response?.data?.error?.message ||
+                'Failed to update application'
             return false
         }
     }
@@ -92,7 +111,9 @@ export const useApplicationsData = (
         if (
             requireConfirmation &&
             typeof window !== 'undefined' &&
-            !window.confirm(`Remove application "${name || id.substring(0, 12)}"?`)
+            !window.confirm(
+                `Remove application "${name || id.substring(0, 12)}"?`,
+            )
         ) {
             return false
         }
@@ -106,7 +127,8 @@ export const useApplicationsData = (
             return true
         } catch (e: any) {
             error.value =
-                e?.response?.data?.error?.message || 'Failed to remove application'
+                e?.response?.data?.error?.message ||
+                'Failed to remove application'
             return false
         }
     }
@@ -128,6 +150,7 @@ export const useApplicationsData = (
         refreshAll,
         startApplication,
         stopApplication,
+        updateApplication,
         removeApplication,
     }
 }

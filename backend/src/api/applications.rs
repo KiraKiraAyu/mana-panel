@@ -38,6 +38,7 @@ pub fn router() -> Router<AppState> {
         .route("/tasks/{task_id}/stream", get(stream_application_task))
         .route("/{id}/start", post(start_application))
         .route("/{id}/stop", post(stop_application))
+        .route("/{id}/update", post(update_application))
         .route("/{id}", delete(remove_application))
 }
 
@@ -148,6 +149,17 @@ async fn stop_application(
 ) -> AppResult<Json<DockerActionResponse>> {
     let manager = manager_from_state(&state)?;
     let result = manager.stop_application(&id).await?;
+    Ok(Json(result))
+}
+
+async fn update_application(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> AppResult<Json<DockerActionResponse>> {
+    let manager = manager_from_state(&state)?;
+    let result = manager
+        .update_application(&id, state.docker.clone())
+        .await?;
     Ok(Json(result))
 }
 
