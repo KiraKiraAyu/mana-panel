@@ -1,4 +1,4 @@
-{# Simplified Caddy template: domain -> upstream reverse proxy #}
+{# Main Caddyfile – imports per-website site configs from sites/ directory #}
 
 {% if email is defined and email != "" %}
 {
@@ -6,11 +6,4 @@
 }
 {% endif %}
 
-{{ domain }} {
-    reverse_proxy {{ upstream_host }}:{{ upstream_port }}
-
-    log {
-        output stdout
-        format console
-    }
-}
+import /etc/caddy/sites/*.conf

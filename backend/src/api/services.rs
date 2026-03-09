@@ -1,11 +1,15 @@
 use axum::{
-    extract::Path,
-    routing::{get, post},
     Json, Router,
+    extract::{Path, Query, State},
+    routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
 
-use crate::AppState;
+use crate::{
+    AppState,
+    error::{AppError, AppResult},
+    services::root_agent::SystemctlAction,
+};
 
 #[cfg(target_os = "linux")]
 use std::process::Command;
@@ -45,25 +49,38 @@ pub fn router() -> Router<AppState> {
         .route("/{name}/logs", get(get_logs))
 }
 
-fn validate_service_name(name: &str) -> Result<(), crate::error::AppError> {
+fn validate_service_name(name: &str) -> AppResult<()> {
     if name.is_empty() || name.len() > 256 {
-        return Err(crate::error::AppError::Validation("Invalid service name length".to_string()));
+        return Err(AppError::Validation(
+            "Invalid service name length".to_string(),
+        ));
     }
 
-    if !name.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '.' || c == '@') {
-        return Err(crate::error::AppError::Validation("Invalid service name characters".to_string()));
+    if !name
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.' || c == '@')
+    {
+        return Err(AppError::Validation(
+            "Invalid service name characters".to_string(),
+        ));
     }
 
     Ok(())
 }
 
-async fn list_services() -> crate::error::AppResult<Json<Vec<ServiceInfo>>> {
+async fn list_services() -> AppResult<Json<Vec<ServiceInfo>>> {
     #[cfg(target_os = "linux")]
     {
         let output = Command::new("systemctl")
-            .args(["list-units", "--type=service", "--all", "--no-pager", "--plain"])
+            .args([
+                "list-units",
+                "--type=service",
+                "--all",
+                "--no-pager",
+                "--plain",
+            ])
             .output()
-            .map_err(|e| crate::error::AppError::System(format!("Failed to run systemctl: {}", e)))?;
+            .map_err(|e| AppError::System(format!("Failed to run systemctl: {}", e)))?;
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         let mut services = Vec::new();
@@ -105,78 +122,53 @@ async fn list_services() -> crate::error::AppResult<Json<Vec<ServiceInfo>>> {
     }
 }
 
-async fn start_service(Path(name): Path<String>) -> crate::error::AppResult<Json<ServiceActionResponse>> {
+async fn start_service(
+    State(state): State<AppState>,
+    Path(name): Path<String>,
+) -> AppResult<Json<ServiceActionResponse>> {
     validate_service_name(&name)?;
-    run_systemctl_action(&name, "start")
+    run_systemctl_action(&state, &name, SystemctlAction::Start).await
 }
 
-async fn stop_service(Path(name): Path<String>) -> crate::error::AppResult<Json<ServiceActionResponse>> {
+async fn stop_service(
+    State(state): State<AppState>,
+    Path(name): Path<String>,
+) -> AppResult<Json<ServiceActionResponse>> {
     validate_service_name(&name)?;
-    run_systemctl_action(&name, "stop")
+    run_systemctl_action(&state, &name, SystemctlAction::Stop).await
 }
 
-async fn restart_service(Path(name): Path<String>) -> crate::error::AppResult<Json<ServiceActionResponse>> {
+async fn restart_service(
+    State(state): State<AppState>,
+    Path(name): Path<String>,
+) -> AppResult<Json<ServiceActionResponse>> {
     validate_service_name(&name)?;
-    run_systemctl_action(&name, "restart")
+    run_systemctl_action(&state, &name, SystemctlAction::Restart).await
 }
 
-fn run_systemctl_action(name: &str, action: &str) -> crate::error::AppResult<Json<ServiceActionResponse>> {
-    #[cfg(target_os = "linux")]
-    {
-        let output = Command::new("systemctl")
-            .args([action, name])
-            .output()
-            .map_err(|e| crate::error::AppError::System(format!("Failed to run systemctl: {}", e)))?;
-
-        if output.status.success() {
-            Ok(Json(ServiceActionResponse {
-                success: true,
-                message: format!("Service {} {}ed successfully", name, action),
-            }))
-        } else {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            Err(crate::error::AppError::System(format!("Failed to {} service: {}", action, stderr)))
-        }
-    }
-
-    #[cfg(not(target_os = "linux"))]
-    {
-        Ok(Json(ServiceActionResponse {
-            success: true,
-            message: format!("Service {} {}ed successfully (mock)", name, action),
-        }))
-    }
+async fn run_systemctl_action(
+    state: &AppState,
+    name: &str,
+    action: SystemctlAction,
+) -> AppResult<Json<ServiceActionResponse>> {
+    let response = state.root_agent.systemctl(action, name).await?;
+    Ok(Json(ServiceActionResponse {
+        success: response.success,
+        message: response.message,
+    }))
 }
 
 async fn get_logs(
+    State(state): State<AppState>,
     Path(name): Path<String>,
-    axum::extract::Query(query): axum::extract::Query<LogsQuery>,
-) -> crate::error::AppResult<Json<ServiceLogs>> {
+    Query(query): Query<LogsQuery>,
+) -> AppResult<Json<ServiceLogs>> {
     validate_service_name(&name)?;
 
-    let lines = query.lines.unwrap_or(100).min(1000);
-
-    #[cfg(target_os = "linux")]
-    {
-        let output = Command::new("journalctl")
-            .args(["-u", &name, "-n", &lines.to_string(), "--no-pager"])
-            .output()
-            .map_err(|e| crate::error::AppError::System(format!("Failed to run journalctl: {}", e)))?;
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let logs: Vec<String> = stdout.lines().map(|s| s.to_string()).collect();
-
-        Ok(Json(ServiceLogs { name, logs }))
-    }
-
-    #[cfg(not(target_os = "linux"))]
-    {
-        Ok(Json(ServiceLogs {
-            name,
-            logs: vec![
-                "Mock log entry 1".to_string(),
-                "Mock log entry 2".to_string(),
-            ],
-        }))
-    }
+    let lines = query.lines.unwrap_or(100).min(1000) as u32;
+    let response = state.root_agent.service_logs(&name, lines).await?;
+    Ok(Json(ServiceLogs {
+        name,
+        logs: response.logs.unwrap_or_default(),
+    }))
 }

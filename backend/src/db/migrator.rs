@@ -8,9 +8,13 @@ impl MigratorTrait for Migrator {
         vec![
             Box::new(m20260211_000001_create_users_table::Migration),
             Box::new(m20260211_000002_create_refresh_tokens_table::Migration),
+            Box::new(m20260305_000001_create_websites_table::Migration),
+            Box::new(m20260305_000002_create_certificates_table::Migration),
         ]
     }
 }
 
 pub mod m20260211_000001_create_users_table;
 pub mod m20260211_000002_create_refresh_tokens_table;
+pub mod m20260305_000001_create_websites_table;
+pub mod m20260305_000002_create_certificates_table;

@@ -6,11 +6,19 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+#[cfg(target_family = "unix")]
+use std::process::Command;
+
 use mana_panel_backend::{
     AppState, api,
     config::Config,
     db,
-    services::{docker::DockerService, monitor::SystemMonitor, user::UserService},
+    services::{
+        docker::DockerService,
+        monitor::SystemMonitor,
+        root_agent::{RootAgentClient, run_root_agent},
+        user::UserService,
+    },
 };
 
 #[derive(Parser, Debug)]
@@ -26,6 +34,7 @@ enum Commands {
         #[arg(short, long)]
         username: String,
     },
+    RootAgent,
 }
 
 #[tokio::main]
@@ -43,7 +52,17 @@ async fn main() {
     // Check for CLI args first
     let cli = Cli::parse();
 
-    // Load db for all modes
+    match &cli.command {
+        Some(Commands::RootAgent) => {
+            if let Err(e) = run_root_agent().await {
+                tracing::error!("Failed to start root agent: {}", e);
+                std::process::exit(1);
+            }
+            return;
+        }
+        _ => {}
+    }
+
     let db_conn = db::init_database(&config.database_url)
         .await
         .expect("Failed to initialize database");
@@ -78,6 +97,9 @@ async fn main() {
         None => {
             // Normal Server Startup
         }
+        Some(Commands::RootAgent) => {
+            // handled above
+        }
     }
 
     // Initialize system monitor
@@ -98,11 +120,44 @@ async fn main() {
         }
     };
 
+    let root_agent = match RootAgentClient::new() {
+        Ok(client) => client,
+        Err(e) => {
+            tracing::error!("Failed to create root agent client: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    if let Err(e) = root_agent.ping().await {
+        tracing::error!("Root agent is required but unavailable: {}", e);
+        std::process::exit(1);
+    }
+
+    #[cfg(target_family = "unix")]
+    {
+        let (uid, gid) = match current_uid_gid() {
+            Ok(ids) => ids,
+            Err(e) => {
+                tracing::error!("Failed to resolve backend uid/gid: {}", e);
+                std::process::exit(1);
+            }
+        };
+
+        if let Err(e) = root_agent.ensure_panel_directories(uid, gid).await {
+            tracing::error!(
+                "Failed to prepare static website root directories via root-agent: {}",
+                e
+            );
+            std::process::exit(1);
+        }
+    }
+
     let state = AppState {
         config: config.clone(),
         monitor,
         db,
         docker,
+        root_agent,
     };
 
     let cors = CorsLayer::new()
@@ -122,4 +177,30 @@ async fn main() {
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
+}
+
+#[cfg(target_family = "unix")]
+fn current_uid_gid() -> Result<(u32, u32), String> {
+    let uid = read_id_value("-u")?;
+    let gid = read_id_value("-g")?;
+    Ok((uid, gid))
+}
+
+#[cfg(target_family = "unix")]
+fn read_id_value(flag: &str) -> Result<u32, String> {
+    let output = Command::new("id")
+        .arg(flag)
+        .output()
+        .map_err(|e| format!("failed to execute `id {}`: {}", flag, e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("`id {}` failed: {}", flag, stderr.trim()));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    stdout
+        .trim()
+        .parse::<u32>()
+        .map_err(|e| format!("invalid `id {}` output '{}': {}", flag, stdout.trim(), e))
 }

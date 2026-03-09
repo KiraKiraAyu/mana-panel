@@ -14,6 +14,7 @@ use crate::services::application_task::{
 };
 use crate::services::compose::{ComposeContainerStatus, ComposeProject, ComposeService};
 use crate::services::docker::{DockerActionResponse, DockerService, PullProgress};
+use crate::services::fs_utils;
 
 const APP_COMPOSE_BASE_DIR: &str = ".mana-panel/applications";
 
@@ -115,6 +116,9 @@ pub struct ApplicationTemplate {
 
     /// Explicit configuration file declarations from `[[config_file]]`.
     pub config_files: Vec<AppTomlConfigFile>,
+    /// Explicit symlink declarations from `[[config_link]]`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub config_links: Vec<AppTomlConfigLink>,
 
     // Helpful for UI
     pub has_conf_templates: bool,
@@ -204,7 +208,7 @@ pub struct InstallApplicationRequest {
 /// Persisted metadata for one installed instance.
 /// This file is used to locate compose project identity and template linkage.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct ApplicationInstanceMeta {
+pub struct ApplicationInstanceMeta {
     pub id: Uuid,
     pub name: String,
     pub template_id: String,
@@ -268,6 +272,13 @@ pub struct AppTomlConfigFile {
     pub path: String,
 }
 
+/// `[[config_link]]` entry used for parsing and API output.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppTomlConfigLink {
+    pub path: String,
+    pub target: String,
+}
+
 /// Complete `app.toml` parsing model used before conversion into `ApplicationTemplate`.
 #[derive(Debug, Clone, Deserialize)]
 struct AppTomlDoc {
@@ -280,6 +291,8 @@ struct AppTomlDoc {
     env: Vec<AppTomlEnv>,
     #[serde(default, rename = "config_file")]
     config_files: Vec<AppTomlConfigFile>,
+    #[serde(default, rename = "config_link")]
+    config_links: Vec<AppTomlConfigLink>,
 }
 
 /// Application domain service responsible for template loading,
@@ -599,7 +612,71 @@ impl ApplicationManager {
         self.compose.ensure_available().await?;
 
         let instance_id = Self::parse_instance_id(instance_id)?;
-        self.load_instance_meta(&instance_id)?;
+        let meta = self.load_instance_meta(&instance_id)?;
+
+        // Re-render compose file with the latest template so upgrades pick up mount points/env changes
+        match self.load_instance_resolved_config(&instance_id) {
+            Ok(resolved_config) => {
+                if let Some(template) = self.find_template(&meta.template_id) {
+                    let mut resolved_values = HashMap::new();
+                    for val in &resolved_config.values {
+                        resolved_values.insert(val.key.clone(), val.value.clone());
+                    }
+
+                    // Build Tera rendering context
+                    let tera_ctx =
+                        self.build_tera_context(&resolved_values, &meta.name, &instance_id, None);
+
+                    match self.render_conf_templates(&template, &instance_id, &tera_ctx) {
+                        Ok(rendered_conf) => {
+                            match self.render_compose_template(&template, &tera_ctx, &rendered_conf)
+                            {
+                                Ok(compose_yaml) => {
+                                    if let Err(e) = self.write_instance_files(
+                                        &meta.id,
+                                        &compose_yaml,
+                                        &meta,
+                                        &resolved_config,
+                                    ) {
+                                        tracing::error!(
+                                            "Failed to write updated instance files for application update '{}': {}",
+                                            instance_id,
+                                            e
+                                        );
+                                    }
+                                }
+                                Err(e) => tracing::error!(
+                                    "Failed to re-render compose template during application update '{}': {}",
+                                    instance_id,
+                                    e
+                                ),
+                            }
+                        }
+                        Err(e) => tracing::error!(
+                            "Failed to re-render conf templates during application update '{}': {}",
+                            instance_id,
+                            e
+                        ),
+                    }
+                } else {
+                    tracing::warn!(
+                        "Template '{}' not found, skipping compose re-render for application update '{}'",
+                        meta.template_id,
+                        instance_id
+                    );
+                }
+            }
+            Err(e) => {
+                // resolved_config.json is required to safely re-render the compose file.
+                // If it is missing, we cannot guarantee the container will have the correct
+                // volume mounts after compose up – abort to prevent a silent misconfiguration.
+                return Err(AppError::System(format!(
+                    "Cannot update application '{}': resolved_config.json is missing or corrupt. \
+                     Please reinstall the application to restore the configuration snapshot. Error: {}",
+                    instance_id, e
+                )));
+            }
+        }
         let project = self.compose_project_for(&instance_id);
         let images = self.extract_images_from_compose_file(&project.compose_file)?;
 
@@ -952,20 +1029,22 @@ impl ApplicationManager {
         let app_dir = PathBuf::from(&template.app_dir);
         let instance_dir = self.instance_dir(instance_id);
 
+        let mut rendered = Vec::new();
         if !template.config_files.is_empty() {
             // ---- Explicit [[config_file]] declarations ----
-            let mut rendered = Vec::new();
             for cf in &template.config_files {
-                let src = app_dir.join(&cf.path);
-                if !src.exists() {
-                    return Err(AppError::Validation(format!(
-                        "Config template '{}' does not exist for app '{}'",
-                        src.display(),
-                        template.id
-                    )));
-                }
-
                 let dst = instance_dir.join(&cf.path);
+
+                let src = app_dir.join(&cf.path);
+                let src_metadata = fs::symlink_metadata(&src).map_err(|e| {
+                    AppError::Validation(format!(
+                        "Config template '{}' does not exist for app '{}': {}",
+                        src.display(),
+                        template.id,
+                        e
+                    ))
+                })?;
+
                 if let Some(parent) = dst.parent() {
                     fs::create_dir_all(parent).map_err(|e| {
                         AppError::System(format!(
@@ -974,6 +1053,20 @@ impl ApplicationManager {
                             e
                         ))
                     })?;
+                }
+
+                if src_metadata.file_type().is_symlink() {
+                    let link_target = fs::read_link(&src).map_err(|e| {
+                        AppError::System(format!(
+                            "Failed to read config symlink '{}': {}",
+                            src.display(),
+                            e
+                        ))
+                    })?;
+
+                    fs_utils::ensure_symlink(&dst, &link_target)?;
+                    rendered.push(dst);
+                    continue;
                 }
 
                 let raw = fs::read_to_string(&src).map_err(|e| {
@@ -995,10 +1088,20 @@ impl ApplicationManager {
 
                 rendered.push(dst);
             }
-            Ok(rendered)
-        } else {
-            Ok(vec![])
         }
+
+        if !template.config_links.is_empty() {
+            // ---- Explicit [[config_link]] declarations ----
+            for cl in &template.config_links {
+                let dst = instance_dir.join(&cl.path);
+                let target = PathBuf::from(&cl.target);
+
+                fs_utils::ensure_symlink(&dst, &target)?;
+                rendered.push(dst);
+            }
+        }
+
+        Ok(rendered)
     }
 
     fn load_templates_from_app_dirs(&self) -> AppResult<Vec<ApplicationTemplate>> {
@@ -1219,8 +1322,32 @@ impl ApplicationManager {
             .collect::<AppResult<Vec<_>>>()?;
 
         let config_files = doc.config_files;
+        let config_links = doc
+            .config_links
+            .into_iter()
+            .map(|c| {
+                let path = c.path.trim().to_string();
+                if path.is_empty() {
+                    return Err(AppError::Validation(format!(
+                        "config_link.path cannot be empty in '{}'",
+                        app_dir.join(DEFAULT_APP_TOML).display()
+                    )));
+                }
 
-        let has_conf_templates = !config_files.is_empty();
+                let target = c.target.trim().to_string();
+                if target.is_empty() {
+                    return Err(AppError::Validation(format!(
+                        "config_link.target cannot be empty for '{}' in '{}'",
+                        path,
+                        app_dir.join(DEFAULT_APP_TOML).display()
+                    )));
+                }
+
+                Ok(AppTomlConfigLink { path, target })
+            })
+            .collect::<AppResult<Vec<_>>>()?;
+
+        let has_conf_templates = !config_files.is_empty() || !config_links.is_empty();
 
         let version = if doc.metadata.version.trim().is_empty() {
             "0.1.0".to_string()
@@ -1250,6 +1377,7 @@ impl ApplicationManager {
             ports,
             env,
             config_files,
+            config_links,
             has_conf_templates,
             app_dir: app_dir.to_string_lossy().to_string(),
         })
@@ -1345,6 +1473,30 @@ impl ApplicationManager {
         Ok(())
     }
 
+    /// Find all installed instance IDs that were created from a specific template.
+    /// Returns a list of (Uuid, container_name) tuples.
+    pub fn list_instance_ids_by_template(
+        &self,
+        template_id: &str,
+    ) -> AppResult<Vec<(uuid::Uuid, String)>> {
+        let mut result = Vec::new();
+        for id in self.list_instance_ids()? {
+            if let Ok(meta) = self.load_instance_meta(&id) {
+                if meta.template_id == template_id {
+                    // Container name follows the convention set in docker-compose.yml:
+                    // container_name: "{{ app_name }}" which resolves to meta.name
+                    result.push((id, meta.name.clone()));
+                }
+            }
+        }
+        Ok(result)
+    }
+
+    /// Returns the filesystem path for a given instance UUID.
+    pub fn get_instance_dir(&self, instance_id: &uuid::Uuid) -> PathBuf {
+        self.instance_dir(instance_id)
+    }
+
     fn list_instance_ids(&self) -> AppResult<Vec<Uuid>> {
         if !self.compose_projects_dir.exists() {
             return Ok(vec![]);
@@ -1378,7 +1530,7 @@ impl ApplicationManager {
         Ok(ids)
     }
 
-    fn load_instance_meta(&self, instance_id: &Uuid) -> AppResult<ApplicationInstanceMeta> {
+    pub fn load_instance_meta(&self, instance_id: &Uuid) -> AppResult<ApplicationInstanceMeta> {
         let meta_file = self.instance_meta_file(instance_id);
         if !meta_file.exists() {
             return Err(AppError::NotFound(format!(
@@ -1399,6 +1551,35 @@ impl ApplicationManager {
             AppError::System(format!(
                 "Failed to parse metadata file '{}': {}",
                 meta_file.display(),
+                e
+            ))
+        })
+    }
+
+    pub fn load_instance_resolved_config(
+        &self,
+        instance_id: &Uuid,
+    ) -> AppResult<ApplicationResolvedInstallConfig> {
+        let resolved_file = self.instance_resolved_config_file(instance_id);
+        if !resolved_file.exists() {
+            return Err(AppError::NotFound(format!(
+                "Resolved config for instance '{}' not found",
+                instance_id
+            )));
+        }
+
+        let raw = fs::read_to_string(&resolved_file).map_err(|e| {
+            AppError::System(format!(
+                "Failed to read resolved config file '{}': {}",
+                resolved_file.display(),
+                e
+            ))
+        })?;
+
+        serde_json::from_str(&raw).map_err(|e| {
+            AppError::System(format!(
+                "Failed to parse resolved config file '{}': {}",
+                resolved_file.display(),
                 e
             ))
         })

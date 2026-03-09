@@ -11,6 +11,7 @@ use std::sync::Arc;
 pub use config::Config;
 pub use services::docker::DockerService;
 pub use services::monitor::SystemMonitor;
+pub use services::root_agent::RootAgentClient;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -18,4 +19,5 @@ pub struct AppState {
     pub monitor: SystemMonitor,
     pub db: Arc<DatabaseConnection>,
     pub docker: Option<DockerService>,
+    pub root_agent: RootAgentClient,
 }

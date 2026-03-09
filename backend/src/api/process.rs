@@ -1,15 +1,15 @@
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     response::sse::{Event, KeepAlive, Sse},
     routing::{get, post},
-    Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
 use std::time::Duration;
-use tokio_stream::{wrappers::IntervalStream, StreamExt};
+use tokio_stream::{StreamExt, wrappers::IntervalStream};
 
-use crate::{error::AppResult, AppState};
+use crate::{AppState, error::AppResult, services::root_agent::ProcessSignal};
 
 #[derive(Debug, Serialize)]
 pub struct ProcessInfo {
@@ -105,7 +105,11 @@ async fn kill_process(
     State(state): State<AppState>,
     Path(pid): Path<u32>,
 ) -> AppResult<Json<ActionResponse>> {
-    state.monitor.kill_process(pid)?;
+    state
+        .root_agent
+        .process_signal(pid, ProcessSignal::Kill)
+        .await?;
+
     Ok(Json(ActionResponse {
         success: true,
         message: format!("Process {} killed", pid),
@@ -116,7 +120,11 @@ async fn stop_process(
     State(state): State<AppState>,
     Path(pid): Path<u32>,
 ) -> AppResult<Json<ActionResponse>> {
-    state.monitor.stop_process(pid)?;
+    state
+        .root_agent
+        .process_signal(pid, ProcessSignal::Stop)
+        .await?;
+
     Ok(Json(ActionResponse {
         success: true,
         message: format!("Process {} stopped", pid),
@@ -127,7 +135,11 @@ async fn resume_process(
     State(state): State<AppState>,
     Path(pid): Path<u32>,
 ) -> AppResult<Json<ActionResponse>> {
-    state.monitor.resume_process(pid)?;
+    state
+        .root_agent
+        .process_signal(pid, ProcessSignal::Continue)
+        .await?;
+
     Ok(Json(ActionResponse {
         success: true,
         message: format!("Process {} resumed", pid),

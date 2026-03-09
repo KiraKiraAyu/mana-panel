@@ -1,8 +1,8 @@
 use axum::{
+    Router,
     extract::ws::{Message, WebSocket, WebSocketUpgrade},
     response::Response,
     routing::get,
-    Router,
 };
 use futures::{SinkExt, StreamExt};
 
@@ -23,7 +23,7 @@ async fn handle_socket(socket: WebSocket) {
     {
         use portable_pty::{CommandBuilder, PtySize, native_pty_system};
         use std::io::Read;
-        
+
         let pty_system = native_pty_system();
         let pair = match pty_system.openpty(PtySize {
             rows: 24,
@@ -33,7 +33,9 @@ async fn handle_socket(socket: WebSocket) {
         }) {
             Ok(pair) => pair,
             Err(e) => {
-                let _ = sender.send(Message::Text(format!("Failed to open PTY: {}", e).into())).await;
+                let _ = sender
+                    .send(Message::Text(format!("Failed to open PTY: {}", e).into()))
+                    .await;
                 return;
             }
         };
@@ -44,7 +46,11 @@ async fn handle_socket(socket: WebSocket) {
         let mut child = match pair.slave.spawn_command(cmd) {
             Ok(child) => child,
             Err(e) => {
-                let _ = sender.send(Message::Text(format!("Failed to spawn shell: {}", e).into())).await;
+                let _ = sender
+                    .send(Message::Text(
+                        format!("Failed to spawn shell: {}", e).into(),
+                    ))
+                    .await;
                 return;
             }
         };
@@ -60,7 +66,11 @@ async fn handle_socket(socket: WebSocket) {
                 match reader.read(&mut buf) {
                     Ok(0) => break,
                     Ok(n) => {
-                        if sender.send(Message::Binary(buf[..n].to_vec().into())).await.is_err() {
+                        if sender
+                            .send(Message::Binary(buf[..n].to_vec().into()))
+                            .await
+                            .is_err()
+                        {
                             break;
                         }
                     }
@@ -101,8 +111,12 @@ async fn handle_socket(socket: WebSocket) {
     #[cfg(not(unix))]
     {
         // Mock terminal for Windows development
-        let _ = sender.send(Message::Text("Welcome to Mana Panel Terminal (Mock Mode)\r\n$ ".into())).await;
-        
+        let _ = sender
+            .send(Message::Text(
+                "Welcome to Mana Panel Terminal (Mock Mode)\r\n$ ".into(),
+            ))
+            .await;
+
         while let Some(msg) = receiver.next().await {
             match msg {
                 Ok(Message::Text(text)) => {

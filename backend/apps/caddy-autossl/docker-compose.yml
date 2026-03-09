@@ -8,8 +8,10 @@ services:
             - "${PANEL_APP_PORT_HTTPS}:443/tcp"
         volumes:
             - "./conf/Caddyfile:/etc/caddy/Caddyfile:ro"
+            - "./conf/sites:/etc/caddy/sites:ro"
             - "./data:/data"
             - "./config:/config"
+            - "/opt/mana-panel/www:/opt/mana-panel/www:ro"
         command:
             - "caddy"
             - "run"

@@ -11,3 +11,4 @@ services:
             - "./conf/sites-enabled:/etc/nginx/sites-enabled:ro"
             - "./conf/includes:/etc/nginx/includes:ro"
             - "./log:/var/log/nginx"
+            - "/opt/mana-panel/www:/opt/mana-panel/www:ro"

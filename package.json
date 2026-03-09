@@ -2,7 +2,10 @@
     "name": "mana-panel",
     "private": true,
     "scripts": {
-        "dev": "concurrently --kill-others-on-fail -n backend,frontend -c blue,green \"pnpm run dev:backend\" \"pnpm run dev:frontend:wait\"",
+        "dev": "pnpm run dev:check-sudo && pnpm run dev:root-agent:ensure && concurrently --kill-others-on-fail -n backend,frontend -c blue,green \"pnpm run dev:backend\" \"pnpm run dev:frontend:wait\"",
+        "dev:check-sudo": "sudo -v",
+        "dev:root-agent:ensure": "sh -c 'sudo pkill -f \"/mana-panel-backend root-agent$\" >/dev/null 2>&1 || true; cargo build --manifest-path backend/Cargo.toml && sudo -E nohup ./backend/target/debug/mana-panel-backend root-agent >/tmp/mana-panel-root-agent.log 2>&1 & node ./scripts/wait_root_agent.js'",
+        "dev:root-agent:stop": "sudo pkill -f \"/mana-panel-backend root-agent$\" || true",
         "dev:backend": "sh -c 'cd backend && if cargo watch --version >/dev/null 2>&1; then cargo watch -x \"run\" -w src -w Cargo.toml; else echo \"cargo-watch not found, falling back to cargo run\"; cargo run; fi'",
         "dev:frontend:wait": "sh -c 'until curl -sSf http://127.0.0.1:3000/api/system/info >/dev/null 2>&1; do echo \"waiting backend...\"; sleep 1; done; pnpm --dir frontend run dev'",
         "dev:frontend": "pnpm --dir frontend run dev",

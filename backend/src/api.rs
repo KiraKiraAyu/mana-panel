@@ -6,6 +6,7 @@ pub mod process;
 pub mod services;
 pub mod system;
 pub mod terminal;
+pub mod websites;
 
 use axum::Router;
 
@@ -19,4 +20,5 @@ pub fn create_router() -> Router<crate::AppState> {
         .nest("/terminal", terminal::router())
         .nest("/docker", docker::router())
         .nest("/applications", applications::router())
+        .nest("/websites", websites::router())
 }

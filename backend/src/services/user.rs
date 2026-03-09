@@ -1,7 +1,7 @@
-use sea_orm::{entity::prelude::*, ActiveValue::Set};
 use crate::db::entities::user;
 use crate::error::{AppError, AppResult};
 use crate::services::password;
+use sea_orm::{entity::prelude::*, ActiveValue::Set};
 
 /// User service for managing user accounts
 pub struct UserService;
@@ -17,7 +17,9 @@ impl UserService {
         // Enforce single user policy
         let count = Self::count_users(db).await?;
         if count > 0 {
-            return Err(AppError::Validation("User already exists. Only one user is allowed.".to_string()));
+            return Err(AppError::Validation(
+                "User already exists. Only one user is allowed.".to_string(),
+            ));
         }
 
         // Check if username already exists
@@ -26,16 +28,16 @@ impl UserService {
             .one(db)
             .await
             .map_err(|e| AppError::Internal(e.into()))?;
-        
+
         if existing.is_some() {
             return Err(AppError::Validation("Username already exists".to_string()));
         }
-        
+
         // Hash the password
         let password_hash = password::hash_password(password)?;
-        
+
         let now = chrono::Utc::now();
-        
+
         let new_user = user::ActiveModel {
             id: Default::default(),
             username: Set(username.to_string()),
@@ -43,20 +45,17 @@ impl UserService {
             created_at: Set(now),
             updated_at: Set(now),
         };
-        
+
         let user = new_user
             .insert(db)
             .await
             .map_err(|e| AppError::Internal(e.into()))?;
-        
+
         Ok(user)
     }
 
     /// Create a new refresh token for a user
-    pub async fn create_refresh_token(
-        db: &DatabaseConnection,
-        user_id: i32,
-    ) -> AppResult<String> {
+    pub async fn create_refresh_token(db: &DatabaseConnection, user_id: i32) -> AppResult<String> {
         use crate::db::entities::refresh_token;
         use rand::Rng;
 
@@ -66,7 +65,7 @@ impl UserService {
             .take(64)
             .map(char::from)
             .collect();
-        
+
         let now = chrono::Utc::now();
         let expires_at = now + chrono::Duration::days(30); // 30 days validity
 
@@ -82,7 +81,7 @@ impl UserService {
             .insert(db)
             .await
             .map_err(|e| AppError::Internal(e.into()))?;
-        
+
         Ok(token)
     }
 
@@ -103,7 +102,10 @@ impl UserService {
         // Check if used (replay attack prevention)
         if token_model.used {
             // Security: Invalidate ALL tokens for this user if a reused token is detected
-            tracing::warn!("Reused refresh token detected for user {}. Revoking all sessions.", token_model.user_id);
+            tracing::warn!(
+                "Reused refresh token detected for user {}. Revoking all sessions.",
+                token_model.user_id
+            );
             Self::revoke_all_user_tokens(db, token_model.user_id).await?;
             return Err(AppError::Auth("Invalid refresh token (reused)".to_string()));
         }
@@ -111,16 +113,17 @@ impl UserService {
         // Check expiry
         if token_model.expires_at < chrono::Utc::now() {
             // Delete expired token
-            let _ = refresh_token::Entity::delete_by_id(token)
-                .exec(db)
-                .await;
+            let _ = refresh_token::Entity::delete_by_id(token).exec(db).await;
             return Err(AppError::Auth("Refresh token expired".to_string()));
         }
 
         // Mark current token as used
         let mut active_token: refresh_token::ActiveModel = token_model.clone().into();
         active_token.used = Set(true);
-        active_token.update(db).await.map_err(|e| AppError::Internal(e.into()))?;
+        active_token
+            .update(db)
+            .await
+            .map_err(|e| AppError::Internal(e.into()))?;
 
         // Get user
         let user = user::Entity::find_by_id(token_model.user_id)
@@ -136,25 +139,19 @@ impl UserService {
     }
 
     /// Revoke a specific refresh token (logout)
-    pub async fn revoke_refresh_token(
-        db: &DatabaseConnection,
-        token: &str,
-    ) -> AppResult<()> {
+    pub async fn revoke_refresh_token(db: &DatabaseConnection, token: &str) -> AppResult<()> {
         use crate::db::entities::refresh_token;
-        
+
         refresh_token::Entity::delete_by_id(token)
             .exec(db)
             .await
             .map_err(|e| AppError::Internal(e.into()))?;
-        
+
         Ok(())
     }
 
     /// Revoke all tokens for a user
-    pub async fn revoke_all_user_tokens(
-        db: &DatabaseConnection,
-        user_id: i32,
-    ) -> AppResult<()> {
+    pub async fn revoke_all_user_tokens(db: &DatabaseConnection, user_id: i32) -> AppResult<()> {
         use crate::db::entities::refresh_token;
 
         refresh_token::Entity::delete_many()
@@ -162,10 +159,10 @@ impl UserService {
             .exec(db)
             .await
             .map_err(|e| AppError::Internal(e.into()))?;
-        
+
         Ok(())
     }
-    
+
     /// Find a user by username
     pub async fn find_by_username(
         db: &DatabaseConnection,
@@ -176,10 +173,10 @@ impl UserService {
             .one(db)
             .await
             .map_err(|e| AppError::Internal(e.into()))?;
-        
+
         Ok(user)
     }
-    
+
     /// Verify user credentials
     pub async fn verify_credentials(
         db: &DatabaseConnection,
@@ -187,7 +184,7 @@ impl UserService {
         password: &str,
     ) -> AppResult<Option<user::Model>> {
         let user = Self::find_by_username(db, username).await?;
-        
+
         match user {
             Some(u) => {
                 if password::verify_password(password, &u.password_hash)? {
@@ -199,7 +196,7 @@ impl UserService {
             None => Ok(None),
         }
     }
-    
+
     /// Update user password
     pub async fn update_password(
         db: &DatabaseConnection,
@@ -208,7 +205,7 @@ impl UserService {
     ) -> AppResult<()> {
         let password_hash = password::hash_password(new_password)?;
         let now = chrono::Utc::now();
-        
+
         user::Entity::update_many()
             .col_expr(user::Column::PasswordHash, Expr::value(password_hash))
             .col_expr(user::Column::UpdatedAt, Expr::value(now))
@@ -216,29 +213,29 @@ impl UserService {
             .exec(db)
             .await
             .map_err(|e| AppError::Internal(e.into()))?;
-        
+
         Ok(())
     }
-    
+
     /// Get user count (for initial setup check)
     pub async fn count_users(db: &DatabaseConnection) -> AppResult<u64> {
         let count = user::Entity::find()
             .count(db)
             .await
             .map_err(|e| AppError::Internal(e.into()))?;
-        
+
         Ok(count)
     }
-    
+
     /// Initialize default admin user if no users exist
     pub async fn init_default_admin(db: &DatabaseConnection) -> AppResult<()> {
         let count = Self::count_users(db).await?;
-        
+
         if count == 0 {
             tracing::info!("Creating default admin user");
             Self::create_user(db, "admin", "admin").await?;
         }
-        
+
         Ok(())
     }
 }

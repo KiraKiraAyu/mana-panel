@@ -8,33 +8,6 @@ readme = "README.md"
 compose_file = "docker-compose.yml"
 
 [[param]]
-key = "domain"
-label = "Domain"
-description = "Public domain for this reverse proxy (required for automatic HTTPS)."
-required = true
-default = ""
-input = "text"
-placeholder = "example.com"
-
-[[param]]
-key = "upstream_host"
-label = "Upstream Host"
-description = "Target host to proxy traffic to."
-required = true
-default = "host.docker.internal"
-input = "text"
-placeholder = "host.docker.internal"
-
-[[param]]
-key = "upstream_port"
-label = "Upstream Port"
-description = "Target port to proxy traffic to."
-required = true
-default = "3000"
-input = "number"
-placeholder = "3000"
-
-[[param]]
 key = "email"
 label = "ACME Email"
 description = "Optional email used for Let's Encrypt account registration."

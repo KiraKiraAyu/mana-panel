@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to {{ website_name }}</title>
+    <style>
+        :root { --primary: #c084fc; --bg: #0f172a; --text: #f8fafc; }
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            line-height: 1.6;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 3rem;
+            border-radius: 24px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(12px);
+            max-width: 500px;
+            text-align: center;
+        }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem; }
+        p { margin-bottom: 2rem; color: #94a3b8; }
+        code { background: rgba(0,0,0,0.3); padding: 0.2rem 0.5rem; border-radius: 4px; font-family: monospace; color: #f472b6; }
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            background: var(--primary);
+            color: white;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="badge">Site is Live</div>
+        <h1>Welcome to {{ website_name }}</h1>
+        <p>This is a default static page automatically created by <strong>Mana Panel</strong>.</p>
+        <p>You can replace this file at:<br><code>{{ index_path }}</code></p>
+    </div>
+</body>
+</html>

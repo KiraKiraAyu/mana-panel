@@ -1,0 +1,24 @@
+[Unit]
+Description=Mana Panel Backend
+After=network-online.target mana-panel-root-agent.service
+Wants=network-online.target
+Requires=mana-panel-root-agent.service
+
+[Service]
+Type=simple
+User=manapanel
+Group=manapanel
+WorkingDirectory=/opt/mana-panel/backend
+EnvironmentFile=/etc/mana-panel/backend.env
+ExecStart=/opt/mana-panel/backend/target/release/mana-panel-backend
+Restart=always
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/
+ReadWritePaths=/opt/mana-panel /run/mana-panel
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,26 @@
+[Unit]
+Description=Mana Panel Root Agent
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/mana-panel/backend
+EnvironmentFile=/etc/mana-panel/backend.env
+ExecStart=/opt/mana-panel/backend/target/release/mana-panel-backend root-agent
+Restart=always
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectSystem=strict
+ReadWritePaths=/run/mana-panel /opt/mana-panel
+RuntimeDirectory=mana-panel
+RuntimeDirectoryMode=0750
+
+[Install]
+WantedBy=multi-user.target

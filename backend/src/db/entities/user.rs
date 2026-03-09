@@ -26,4 +26,3 @@ impl Related<super::refresh_token::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
-

@@ -1,13 +1,13 @@
 use axum::{
+    Json, Router,
     extract::State,
     response::sse::{Event, KeepAlive, Sse},
     routing::get,
-    Json, Router,
 };
 use serde::Serialize;
 use std::convert::Infallible;
 use std::time::Duration;
-use tokio_stream::{wrappers::IntervalStream, StreamExt};
+use tokio_stream::{StreamExt, wrappers::IntervalStream};
 
 use crate::AppState;
 

@@ -1,10 +1,11 @@
-use bollard::Docker;
 use bollard::container::{
     Config, CreateContainerOptions, InspectContainerOptions, ListContainersOptions, LogsOptions,
     RemoveContainerOptions, StatsOptions,
 };
+use bollard::exec::{CreateExecOptions, StartExecResults};
 use bollard::image::{CreateImageOptions, ListImagesOptions, RemoveImageOptions};
 use bollard::models::{ContainerInspectResponse, ContainerSummary, ImageSummary};
+use bollard::Docker;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -434,6 +435,88 @@ impl DockerService {
             success: true,
             message: format!("Container created with id {}", response.id),
         })
+    }
+
+    /// Connect a container to a network.
+    pub async fn connect_network(
+        &self,
+        container: &str,
+        network: &str,
+    ) -> AppResult<DockerActionResponse> {
+        let opts = bollard::network::ConnectNetworkOptions {
+            container: container.to_string(),
+            endpoint_config: bollard::models::EndpointSettings::default(),
+        };
+
+        match self.client.connect_network(network, opts).await {
+            Ok(_) => Ok(DockerActionResponse {
+                success: true,
+                message: format!("Connected {} to {}", container, network),
+            }),
+            Err(e) => {
+                // Ignore if already connected
+                if e.to_string().contains("already exists in network") {
+                    return Ok(DockerActionResponse {
+                        success: true,
+                        message: format!("{} already connected to {}", container, network),
+                    });
+                }
+                Err(Self::map_docker_error("connect_network", e))
+            }
+        }
+    }
+
+    /// Execute a command inside a running container.
+    /// Returns the combined stdout/stderr output of the command.
+    pub async fn exec_container(&self, container_name: &str, cmd: Vec<&str>) -> AppResult<String> {
+        let exec = self
+            .client
+            .create_exec(
+                container_name,
+                CreateExecOptions {
+                    cmd: Some(cmd.clone()),
+                    attach_stdout: Some(true),
+                    attach_stderr: Some(true),
+                    ..Default::default()
+                },
+            )
+            .await
+            .map_err(|e| Self::map_docker_error("create_exec", e))?;
+
+        let output = self
+            .client
+            .start_exec(&exec.id, None)
+            .await
+            .map_err(|e| Self::map_docker_error("start_exec", e))?;
+
+        let mut result = String::new();
+        if let StartExecResults::Attached {
+            output: mut stream, ..
+        } = output
+        {
+            while let Some(Ok(msg)) = stream.next().await {
+                result.push_str(&msg.to_string());
+            }
+        }
+
+        let inspect = self
+            .client
+            .inspect_exec(&exec.id)
+            .await
+            .map_err(|e| Self::map_docker_error("inspect_exec", e))?;
+
+        if let Some(exit_code) = inspect.exit_code {
+            if exit_code != 0 {
+                return Err(AppError::System(format!(
+                    "Command '{}' failed with exit code {}: {}",
+                    cmd.join(" "),
+                    exit_code,
+                    result.trim()
+                )));
+            }
+        }
+
+        Ok(result)
     }
 
     // -- Images -------------------------------------------------------------

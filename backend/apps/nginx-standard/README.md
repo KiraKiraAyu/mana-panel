@@ -27,16 +27,20 @@ advanced routing, SSL certificate lifecycle, WAF, path rules, and policy details
 
 ## Rendered files
 
-At install time, Mana Panel renders and writes:
+At install time, Mana Panel renders regular config files:
 
 - `conf/nginx.conf`
 - `conf/sites-available/default.conf`
-- `conf/sites-enabled/default.conf`
 - `conf/includes/http/upgrade_map.conf`
 - `conf/includes/http/proxy_base.conf`
 - `conf/includes/server/base.conf`
 
-Then Docker Compose mounts them into the container.
+Then it creates links declared by `[[config_link]]`:
+
+- `conf/sites-enabled/default.conf` -> `../sites-available/default.conf`
+
+The template can keep `conf/sites-enabled/` empty.  
+Docker Compose mounts both directories into the container.
 
 ## Behavior
 
@@ -45,6 +49,7 @@ The generated gateway config keeps `nginx.conf` minimally invasive and delegates
 - Listens on port `80`
 - Matches `server_name`
 - Uses Ubuntu-style site layout (`sites-available` + `sites-enabled`)
+- `sites-enabled/*.conf` entries are symlinks to `sites-available/*.conf`
 - With `proxy_url` set: tries local static files first, then proxies to upstream
 - With empty `proxy_url`: serves static files only and returns `404` for missing paths
 - Provides `/healthz` endpoint

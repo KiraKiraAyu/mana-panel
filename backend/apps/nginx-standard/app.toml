@@ -41,8 +41,9 @@ path = "conf/nginx.conf"
 [[config_file]]
 path = "conf/sites-available/default.conf"
 
-[[config_file]]
+[[config_link]]
 path = "conf/sites-enabled/default.conf"
+target = "../sites-available/default.conf"
 
 [[config_file]]
 path = "conf/includes/http/upgrade_map.conf"

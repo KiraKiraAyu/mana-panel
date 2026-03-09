@@ -2,8 +2,8 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use sysinfo::{Disks, Networks, Pid, ProcessesToUpdate, Signal, System};
 
-use crate::api::system::{DiskInfo, NetworkInfo, SystemInfo, SystemStats};
 use crate::api::process::ProcessInfo;
+use crate::api::system::{DiskInfo, NetworkInfo, SystemInfo, SystemStats};
 use crate::error::{AppError, AppResult};
 
 /// Configurable refresh intervals to avoid excessive system calls
@@ -87,30 +87,40 @@ impl SystemMonitor {
         let memory_used = state.system.used_memory();
         let memory_total = state.system.total_memory();
 
-        let disk_infos: Vec<DiskInfo> = state.disks.iter().map(|disk| {
-            let total = disk.total_space();
-            let available = disk.available_space();
-            let used = total.saturating_sub(available);
+        let disk_infos: Vec<DiskInfo> = state
+            .disks
+            .iter()
+            .map(|disk| {
+                let total = disk.total_space();
+                let available = disk.available_space();
+                let used = total.saturating_sub(available);
 
-            DiskInfo {
-                name: disk.name().to_string_lossy().to_string(),
-                mount_point: disk.mount_point().to_string_lossy().to_string(),
-                total,
-                used,
-                available,
-                percent: if total > 0 { (used as f32 / total as f32) * 100.0 } else { 0.0 },
-            }
-        }).collect();
+                DiskInfo {
+                    name: disk.name().to_string_lossy().to_string(),
+                    mount_point: disk.mount_point().to_string_lossy().to_string(),
+                    total,
+                    used,
+                    available,
+                    percent: if total > 0 {
+                        (used as f32 / total as f32) * 100.0
+                    } else {
+                        0.0
+                    },
+                }
+            })
+            .collect();
 
-        let network_infos: Vec<NetworkInfo> = state.networks.iter().map(|(name, data)| {
-            NetworkInfo {
+        let network_infos: Vec<NetworkInfo> = state
+            .networks
+            .iter()
+            .map(|(name, data)| NetworkInfo {
                 name: name.to_string(),
                 rx_bytes: data.total_received(),
                 tx_bytes: data.total_transmitted(),
                 rx_packets: data.total_packets_received(),
                 tx_packets: data.total_packets_transmitted(),
-            }
-        }).collect();
+            })
+            .collect();
 
         let load_avg = System::load_average();
 
@@ -139,32 +149,36 @@ impl SystemMonitor {
         // Only refresh processes if enough time has passed
         if now.duration_since(state.last_process_refresh) >= PROCESS_REFRESH_INTERVAL {
             // Refresh processes (sysinfo 0.33 compatible API)
-            state
-                .system
-                .refresh_processes(ProcessesToUpdate::All, true);
+            state.system.refresh_processes(ProcessesToUpdate::All, true);
             state.last_process_refresh = now;
         }
 
-        state.system.processes().iter().map(|(pid, process)| {
-            let cmd_vec: Vec<String> = process.cmd()
-                .iter()
-                .map(|s| s.to_string_lossy().to_string())
-                .collect();
+        state
+            .system
+            .processes()
+            .iter()
+            .map(|(pid, process)| {
+                let cmd_vec: Vec<String> = process
+                    .cmd()
+                    .iter()
+                    .map(|s| s.to_string_lossy().to_string())
+                    .collect();
 
-            ProcessInfo {
-                pid: pid.as_u32(),
-                name: process.name().to_string_lossy().to_string(),
-                cmd: cmd_vec,
-                cpu_usage: process.cpu_usage(),
-                memory: process.memory(),
-                status: format!("{:?}", process.status()),
-                user: process
-                    .user_id()
-                    .map(|u| u.to_string())
-                    .unwrap_or_else(|| "unknown".to_string()),
-                start_time: process.start_time(),
-            }
-        }).collect()
+                ProcessInfo {
+                    pid: pid.as_u32(),
+                    name: process.name().to_string_lossy().to_string(),
+                    cmd: cmd_vec,
+                    cpu_usage: process.cpu_usage(),
+                    memory: process.memory(),
+                    status: format!("{:?}", process.status()),
+                    user: process
+                        .user_id()
+                        .map(|u| u.to_string())
+                        .unwrap_or_else(|| "unknown".to_string()),
+                    start_time: process.start_time(),
+                }
+            })
+            .collect()
     }
 
     pub fn kill_process(&self, pid: u32) -> AppResult<()> {
@@ -210,7 +224,9 @@ impl SystemMonitor {
 
         #[cfg(target_os = "windows")]
         {
-            Err(AppError::System("Process stop/resume is not supported on Windows".to_string()))
+            Err(AppError::System(
+                "Process stop/resume is not supported on Windows".to_string(),
+            ))
         }
     }
 
@@ -237,7 +253,9 @@ impl SystemMonitor {
 
         #[cfg(target_os = "windows")]
         {
-            Err(AppError::System("Process stop/resume is not supported on Windows".to_string()))
+            Err(AppError::System(
+                "Process stop/resume is not supported on Windows".to_string(),
+            ))
         }
     }
 

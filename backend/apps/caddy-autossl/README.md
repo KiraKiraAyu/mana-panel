@@ -16,10 +16,9 @@ advanced routing policies, per-path rules, upstream pools, middleware chains, an
 
 | Key | Type | Required | Default | Description |
 |---|---|---:|---|---|
-| `domain` | text | ✅ | (empty) | Public domain used for automatic HTTPS and routing |
-| `upstream_host` | text | ✅ | `host.docker.internal` | Upstream target host |
-| `upstream_port` | number | ✅ | `3000` | Upstream target port |
 | `email` | text | ❌ | (empty) | Optional email for ACME account registration |
+
+*(Note: Domain routing bindings are now managed dynamically by the Website engine entirely bypassing application form parameters).*
 
 ## Ports
 
