@@ -55,7 +55,7 @@ pub struct Model {
     pub aliases: serde_json::Value,
     pub server_type: ServerType,
     pub server_instance_id: Option<String>,
-    pub site_type: SiteType,
+    pub site_types: serde_json::Value,
     pub proxy_target_type: Option<ProxyTargetType>,
     pub proxy_target_url: Option<String>,
     pub proxy_target_app_id: Option<String>,

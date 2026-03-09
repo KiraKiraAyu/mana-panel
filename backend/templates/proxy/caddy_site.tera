@@ -1,10 +1,19 @@
 # Managed by mana-panel – Website ID: {{ website_id }}
 {{ primary_domain }}{% for alias in aliases %}, {{ alias }}{% endfor %} {
-{% if site_type == "reverse_proxy" %}
-    reverse_proxy {{ proxy_target }}
-{% elif site_type == "static" %}
+{% if has_static %}
     root * {{ root_dir }}
+{% endif %}
+
+{% if has_static and has_reverse_proxy %}
+    @notStatic {
+        not file
+    }
+    reverse_proxy @notStatic {{ proxy_target }}
     file_server
+{% elif has_static %}
+    file_server
+{% elif has_reverse_proxy %}
+    reverse_proxy {{ proxy_target }}
 {% endif %}
 
     log {

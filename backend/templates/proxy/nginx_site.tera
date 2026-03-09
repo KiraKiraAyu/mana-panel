@@ -5,8 +5,17 @@ server {
 
     server_name {{ primary_domain }}{% for alias in aliases %} {{ alias }}{% endfor %};
 
-{% if site_type == "reverse_proxy" %}
+{% if has_static %}
+    root {{ root_dir }};
+    index index.html;
+{% endif %}
+
     location / {
+{% if has_static and has_reverse_proxy %}
+        try_files $uri $uri/ @proxy;
+{% elif has_static %}
+        try_files $uri $uri/ =404;
+{% elif has_reverse_proxy %}
         proxy_pass {{ proxy_target }};
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
@@ -15,13 +24,19 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+{% endif %}
     }
-{% elif site_type == "static" %}
-    root {{ root_dir }};
-    index index.html;
 
-    location / {
-        try_files $uri $uri/ =404;
+{% if has_static and has_reverse_proxy %}
+    location @proxy {
+        proxy_pass {{ proxy_target }};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 {% endif %}
 

@@ -21,8 +21,11 @@ impl ProxyConfigService {
     ) -> AppResult<()> {
         let config_content = Self::render_config(website, app_manager)?;
 
+        let site_types_vec: Vec<SiteType> =
+            serde_json::from_value(website.site_types.clone()).unwrap_or_default();
+
         // If static site, ensure root_dir exists and is not empty
-        if website.site_type == SiteType::Static {
+        if site_types_vec.contains(&SiteType::Static) {
             if let Some(ref root_dir) = website.root_dir {
                 let path = Path::new(root_dir);
                 if !path.exists() {
@@ -58,7 +61,7 @@ impl ProxyConfigService {
             Self::resolve_target(website, app_manager).await?;
 
         // Connect proxy network to target app's network to support internal container name routing
-        if website.site_type == SiteType::ReverseProxy {
+        if site_types_vec.contains(&SiteType::ReverseProxy) {
             if let Some(ProxyTargetType::Application) = website.proxy_target_type {
                 if let Some(ref app_id_str) = website.proxy_target_app_id {
                     if let Ok(app_id) = uuid::Uuid::parse_str(app_id_str) {
@@ -260,22 +263,28 @@ impl ProxyConfigService {
             serde_json::from_value(website.aliases.clone()).unwrap_or_default();
         ctx.insert("aliases", &aliases);
 
-        match website.site_type {
-            SiteType::ReverseProxy => {
-                ctx.insert("site_type", "reverse_proxy");
-                let target = Self::build_proxy_target(website, app_manager);
-                ctx.insert("proxy_target", &target);
-            }
-            SiteType::Static => {
-                ctx.insert("site_type", "static");
-                ctx.insert(
-                    "root_dir",
-                    website
-                        .root_dir
-                        .as_deref()
-                        .unwrap_or("/usr/share/nginx/html"),
-                );
-            }
+        let site_types_vec: Vec<SiteType> =
+            serde_json::from_value(website.site_types.clone()).unwrap_or_default();
+        
+        let has_static = site_types_vec.contains(&SiteType::Static);
+        let has_reverse_proxy = site_types_vec.contains(&SiteType::ReverseProxy);
+
+        ctx.insert("has_static", &has_static);
+        ctx.insert("has_reverse_proxy", &has_reverse_proxy);
+
+        if has_reverse_proxy {
+            let target = Self::build_proxy_target(website, app_manager);
+            ctx.insert("proxy_target", &target);
+        }
+        
+        if has_static {
+            ctx.insert(
+                "root_dir",
+                website
+                    .root_dir
+                    .as_deref()
+                    .unwrap_or("/usr/share/nginx/html"),
+            );
         }
 
         tera.render(template_name, &ctx)
@@ -428,9 +437,12 @@ impl ProxyConfigService {
         instance_id: &uuid::Uuid,
         instance_dir: &PathBuf,
     ) -> AppResult<()> {
+        let site_types_vec: Vec<SiteType> =
+            serde_json::from_value(website.site_types.clone()).unwrap_or_default();
+
         match website.server_type {
             ServerType::Nginx | ServerType::OpenResty => {
-                if website.site_type == SiteType::Static {
+                if site_types_vec.contains(&SiteType::Static) {
                     let compose_file = instance_dir.join("docker-compose.yml");
                     if compose_file.exists() {
                         if let Ok(content) = std::fs::read_to_string(&compose_file) {

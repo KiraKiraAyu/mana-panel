@@ -12,7 +12,7 @@ export interface WebsiteInfo {
     aliases: string[]
     server_type: ServerType
     server_instance_id: string | null
-    site_type: SiteType
+    site_types: SiteType[]
     proxy_target_type: ProxyTargetType | null
     proxy_target_url: string | null
     proxy_target_app_id: string | null
@@ -30,7 +30,7 @@ export interface CreateWebsiteRequest {
     primary_domain: string
     aliases?: string[]
     server_instance_id: string
-    site_type: SiteType
+    site_types: SiteType[]
     proxy_target_type?: ProxyTargetType | null
     proxy_target_url?: string | null
     proxy_target_app_id?: string | null
@@ -43,6 +43,7 @@ export interface UpdateWebsiteRequest {
     primary_domain?: string
     aliases?: string[]
     server_instance_id?: string
+    site_types?: SiteType[]
     proxy_target_type?: ProxyTargetType | null
     proxy_target_url?: string | null
     proxy_target_app_id?: string | null

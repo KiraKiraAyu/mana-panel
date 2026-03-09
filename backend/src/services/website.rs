@@ -22,7 +22,7 @@ pub struct WebsiteInfo {
     pub aliases: Vec<String>,
     pub server_type: ServerType,
     pub server_instance_id: Option<String>,
-    pub site_type: SiteType,
+    pub site_types: Vec<SiteType>,
     pub proxy_target_type: Option<ProxyTargetType>,
     pub proxy_target_url: Option<String>,
     pub proxy_target_app_id: Option<String>,
@@ -45,7 +45,7 @@ impl From<website::Model> for WebsiteInfo {
             aliases,
             server_type: m.server_type,
             server_instance_id: m.server_instance_id,
-            site_type: m.site_type,
+            site_types: serde_json::from_value(m.site_types).unwrap_or_default(),
             proxy_target_type: m.proxy_target_type,
             proxy_target_url: m.proxy_target_url,
             proxy_target_app_id: m.proxy_target_app_id,
@@ -67,7 +67,7 @@ pub struct CreateWebsiteRequest {
     #[serde(default)]
     pub aliases: Vec<String>,
     pub server_instance_id: String,
-    pub site_type: SiteType,
+    pub site_types: Vec<SiteType>,
     pub proxy_target_type: Option<ProxyTargetType>,
     pub proxy_target_url: Option<String>,
     pub proxy_target_app_id: Option<String>,
@@ -90,6 +90,7 @@ pub struct UpdateWebsiteRequest {
     pub primary_domain: Option<String>,
     pub aliases: Option<Vec<String>>,
     pub server_instance_id: Option<String>,
+    pub site_types: Option<Vec<SiteType>>,
 
     #[serde(default, deserialize_with = "deserialize_some")]
     pub proxy_target_type: Option<Option<ProxyTargetType>>,
@@ -251,32 +252,31 @@ impl WebsiteService {
             aliases: Set(serde_json::to_value(&req.aliases).unwrap_or_default()),
             server_type: Set(resolved_server_type),
             server_instance_id: Set(Some(req.server_instance_id.clone())),
-            site_type: Set(req.site_type.clone()),
-            proxy_target_type: Set(match &req.site_type {
-                SiteType::ReverseProxy => req.proxy_target_type.clone(),
-                SiteType::Static => None,
+            site_types: Set(serde_json::to_value(&req.site_types).unwrap_or_default()),
+            proxy_target_type: Set(if req.site_types.contains(&SiteType::ReverseProxy) {
+                req.proxy_target_type.clone()
+            } else {
+                None
             }),
-            proxy_target_url: Set(match (&req.site_type, &req.proxy_target_type) {
-                (SiteType::ReverseProxy, Some(ProxyTargetType::Url)) => {
-                    req.proxy_target_url.clone()
-                }
-                _ => None,
+            proxy_target_url: Set(if req.site_types.contains(&SiteType::ReverseProxy) && matches!(&req.proxy_target_type, Some(ProxyTargetType::Url)) {
+                req.proxy_target_url.clone()
+            } else {
+                None
             }),
-            proxy_target_app_id: Set(match (&req.site_type, &req.proxy_target_type) {
-                (SiteType::ReverseProxy, Some(ProxyTargetType::Application)) => {
-                    req.proxy_target_app_id.clone()
-                }
-                _ => None,
+            proxy_target_app_id: Set(if req.site_types.contains(&SiteType::ReverseProxy) && matches!(&req.proxy_target_type, Some(ProxyTargetType::Application)) {
+                req.proxy_target_app_id.clone()
+            } else {
+                None
             }),
-            proxy_target_app_port: Set(match (&req.site_type, &req.proxy_target_type) {
-                (SiteType::ReverseProxy, Some(ProxyTargetType::Application)) => {
-                    req.proxy_target_app_port
-                }
-                _ => None,
+            proxy_target_app_port: Set(if req.site_types.contains(&SiteType::ReverseProxy) && matches!(&req.proxy_target_type, Some(ProxyTargetType::Application)) {
+                req.proxy_target_app_port
+            } else {
+                None
             }),
-            root_dir: Set(match &req.site_type {
-                SiteType::Static => req.root_dir.clone(),
-                SiteType::ReverseProxy => None,
+            root_dir: Set(if req.site_types.contains(&SiteType::Static) {
+                req.root_dir.clone()
+            } else {
+                None
             }),
             status: Set(WebsiteStatus::Running),
             has_ssl: Set(false),
@@ -423,6 +423,14 @@ impl WebsiteService {
             am.root_dir = Set(root_dir);
         }
 
+        let existing_site_types: Vec<SiteType> = serde_json::from_value(existing.site_types.clone()).unwrap_or_default();
+        let mut final_site_types = existing_site_types.clone();
+
+        if let Some(site_types) = req.site_types {
+            final_site_types = site_types.clone();
+            am.site_types = Set(serde_json::to_value(site_types).unwrap_or_default());
+        }
+
         let mut final_proxy_target_type = match &am.proxy_target_type {
             sea_orm::ActiveValue::Set(v) => v.clone(),
             _ => existing.proxy_target_type.clone(),
@@ -433,7 +441,16 @@ impl WebsiteService {
         };
 
         // Priority: Explicitly clear opposing proxy target type fields before validation
-        if matches!(existing.site_type, SiteType::ReverseProxy) {
+        if !final_site_types.contains(&SiteType::ReverseProxy) {
+            am.proxy_target_type = Set(None);
+            final_proxy_target_type = None;
+            am.proxy_target_url = Set(None);
+            final_proxy_url = None;
+            am.proxy_target_app_id = Set(None);
+            final_proxy_app = None;
+            am.proxy_target_app_port = Set(None);
+            final_proxy_app_port = None;
+        } else {
             if final_proxy_target_type == Some(ProxyTargetType::Url) {
                 am.proxy_target_app_id = Set(None);
                 final_proxy_app = None;
@@ -443,21 +460,15 @@ impl WebsiteService {
                 am.proxy_target_url = Set(None);
                 final_proxy_url = None;
             }
+        }
+
+        if !final_site_types.contains(&SiteType::Static) {
             am.root_dir = Set(None);
             final_root_dir = None;
-        } else if matches!(existing.site_type, SiteType::Static) {
-            am.proxy_target_type = Set(None);
-            final_proxy_target_type = None;
-            am.proxy_target_url = Set(None);
-            final_proxy_url = None;
-            am.proxy_target_app_id = Set(None);
-            final_proxy_app = None;
-            am.proxy_target_app_port = Set(None);
-            final_proxy_app_port = None;
         }
 
         Self::validate_site_config(
-            &existing.site_type,
+            &final_site_types,
             final_proxy_target_type.as_ref(),
             final_proxy_url.as_deref(),
             final_proxy_app.as_deref(),
@@ -548,7 +559,7 @@ impl WebsiteService {
         }
 
         Self::validate_site_config(
-            &req.site_type,
+            &req.site_types,
             req.proxy_target_type.as_ref(),
             req.proxy_target_url.as_deref(),
             req.proxy_target_app_id.as_deref(),
@@ -558,15 +569,21 @@ impl WebsiteService {
     }
 
     fn validate_site_config(
-        site_type: &SiteType,
+        site_types: &[SiteType],
         proxy_target_type: Option<&ProxyTargetType>,
         proxy_target_url: Option<&str>,
         proxy_target_app_id: Option<&str>,
         proxy_target_app_port: Option<i32>,
         root_dir: Option<&str>,
     ) -> AppResult<()> {
-        match site_type {
-            SiteType::ReverseProxy => match proxy_target_type {
+        if site_types.is_empty() {
+            return Err(AppError::Validation(
+                "At least one site type must be specified".to_string(),
+            ));
+        }
+
+        if site_types.contains(&SiteType::ReverseProxy) {
+            match proxy_target_type {
                 Some(ProxyTargetType::Url) => {
                     let has_url = proxy_target_url
                         .map(|u| !u.trim().is_empty())
@@ -610,24 +627,25 @@ impl WebsiteService {
                         "Reverse proxy site must specify a proxy target type".to_string(),
                     ));
                 }
-            },
-            SiteType::Static => {
-                let has_root = root_dir
-                    .map(|r| !r.trim().is_empty())
-                    .unwrap_or(false);
-                if !has_root {
-                    return Err(AppError::Validation(
-                        "Static site must specify a root directory".to_string(),
-                    ));
-                }
+            }
+        }
 
-                if let Some(r) = root_dir {
-                    let path = PathBuf::from(r.trim());
-                    if !path.starts_with("/opt/mana-panel/www") {
-                        return Err(AppError::Validation(
-                            "Static site root directory must be located inside /opt/mana-panel/www to ensure proper volume mounting".to_string(),
-                        ));
-                    }
+        if site_types.contains(&SiteType::Static) {
+            let has_root = root_dir
+                .map(|r| !r.trim().is_empty())
+                .unwrap_or(false);
+            if !has_root {
+                return Err(AppError::Validation(
+                    "Static site must specify a root directory".to_string(),
+                ));
+            }
+
+            if let Some(r) = root_dir {
+                let path = PathBuf::from(r.trim());
+                if !path.starts_with("/opt/mana-panel/www") {
+                    return Err(AppError::Validation(
+                        "Static site root directory must be located inside /opt/mana-panel/www to ensure proper volume mounting".to_string(),
+                    ));
                 }
             }
         }

@@ -92,15 +92,19 @@
                     <span class="px-2 py-0.5 rounded bg-surface-overlay">{{
                         serverInstanceLabel(site)
                     }}</span>
-                    <span>•</span>
-                    <span>{{ siteTypeLabel(site.site_type) }}</span>
-                    <template v-if="site.site_type === 'reverse_proxy'">
+                    <span class="flex items-center gap-1">
+                        <template v-for="(type, index) in site.site_types" :key="type">
+                            <span>{{ siteTypeLabel(type) }}</span>
+                            <span v-if="index < site.site_types.length - 1" class="text-text-muted/50">+</span>
+                        </template>
+                    </span>
+                    <template v-if="site.site_types.includes('reverse_proxy')">
                         <span>→</span>
                         <span class="text-reisa-pink-400 truncate max-w-48">{{
                             proxyTargetLabel(site)
                         }}</span>
                     </template>
-                    <template v-if="site.site_type === 'static'">
+                    <template v-if="site.site_types.includes('static')">
                         <span>→</span>
                         <span class="text-reisa-gold-400 truncate max-w-48">{{
                             site.root_dir
@@ -310,24 +314,38 @@
                         </p>
                     </div>
 
-                    <!-- Site Type -->
+                    <!-- Site Types (Checkboxes) -->
                     <div>
                         <label
-                            class="block text-sm font-medium text-text-secondary mb-1"
-                            >Site Type</label
+                            class="block text-sm font-medium text-text-secondary mb-2"
+                            >Site Modes</label
                         >
-                        <select
-                            v-model="form.site_type"
-                            class="input"
-                            :disabled="!!editingSite"
-                        >
-                            <option value="reverse_proxy">Reverse Proxy</option>
-                            <option value="static">Static Site</option>
-                        </select>
+                        <div class="space-y-2">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input 
+                                    type="checkbox" 
+                                    value="reverse_proxy" 
+                                    v-model="form.site_types" 
+                                    class="checkbox checkbox-primary"
+                                    :disabled="!!editingSite"
+                                >
+                                <span class="text-sm text-text-primary">Reverse Proxy</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input 
+                                    type="checkbox" 
+                                    value="static" 
+                                    v-model="form.site_types" 
+                                    class="checkbox checkbox-primary"
+                                    :disabled="!!editingSite"
+                                >
+                                <span class="text-sm text-text-primary">Static Site</span>
+                            </label>
+                        </div>
                     </div>
 
                     <!-- Reverse Proxy Config -->
-                    <template v-if="form.site_type === 'reverse_proxy'">
+                    <template v-if="form.site_types.includes('reverse_proxy')">
                         <!-- Target Type -->
                         <div>
                             <label
@@ -412,7 +430,7 @@
                     </template>
 
                     <!-- Static Site Config -->
-                    <div v-if="form.site_type === 'static'">
+                    <div v-if="form.site_types.includes('static')">
                         <label
                             class="block text-sm font-medium text-text-secondary mb-1"
                             >Root Directory</label
@@ -477,7 +495,7 @@ const form = ref<{
     name: string
     primary_domain: string
     server_instance_id: string
-    site_type: SiteType
+    site_types: SiteType[]
     proxy_target_type: ProxyTargetType
     proxy_target_url: string
     proxy_target_app_id: string
@@ -487,7 +505,7 @@ const form = ref<{
     name: '',
     primary_domain: '',
     server_instance_id: '',
-    site_type: 'reverse_proxy',
+    site_types: ['reverse_proxy'],
     proxy_target_type: 'url',
     proxy_target_url: '',
     proxy_target_app_id: '',
@@ -527,9 +545,9 @@ const selectedAppPorts = computed<ApplicationPort[]>(() => {
 
 // Auto-populate root_dir for static sites
 watch(
-    [() => form.value.name, () => form.value.site_type],
-    ([newName, newType]) => {
-        if (newType === 'static' && !editingSite.value) {
+    [() => form.value.name, () => form.value.site_types],
+    ([newName, newTypes]) => {
+        if (newTypes.includes('static') && !editingSite.value) {
             const sanitized = newName
                 .toLowerCase()
                 .trim()
@@ -572,7 +590,7 @@ const resetForm = () => {
         name: '',
         primary_domain: '',
         server_instance_id: '',
-        site_type: 'reverse_proxy',
+        site_types: ['reverse_proxy'],
         proxy_target_type: 'url',
         proxy_target_url: '',
         proxy_target_app_id: '',
@@ -588,7 +606,7 @@ const editWebsite = (site: WebsiteInfo) => {
         name: site.name,
         primary_domain: site.primary_domain,
         server_instance_id: site.server_instance_id || '',
-        site_type: site.site_type,
+        site_types: [...site.site_types],
         proxy_target_type: site.proxy_target_type || 'url',
         proxy_target_url: site.proxy_target_url || '',
         proxy_target_app_id: site.proxy_target_app_id || '',
@@ -626,7 +644,7 @@ const submitForm = async () => {
                 server_instance_id: form.value.server_instance_id,
             }
 
-            if (form.value.site_type === 'reverse_proxy') {
+            if (form.value.site_types.includes('reverse_proxy')) {
                 payload.proxy_target_type = form.value.proxy_target_type
                 if (form.value.proxy_target_type === 'url') {
                     payload.proxy_target_url =
@@ -637,7 +655,8 @@ const submitForm = async () => {
                     payload.proxy_target_app_port =
                         form.value.proxy_target_app_port || null
                 }
-            } else {
+            }
+            if (form.value.site_types.includes('static')) {
                 payload.root_dir = form.value.root_dir || null
             }
 
@@ -648,10 +667,10 @@ const submitForm = async () => {
                 primary_domain: form.value.primary_domain,
                 aliases,
                 server_instance_id: form.value.server_instance_id,
-                site_type: form.value.site_type,
+                site_types: form.value.site_types,
             }
 
-            if (form.value.site_type === 'reverse_proxy') {
+            if (form.value.site_types.includes('reverse_proxy')) {
                 payload.proxy_target_type = form.value.proxy_target_type
                 if (form.value.proxy_target_type === 'url') {
                     payload.proxy_target_url = form.value.proxy_target_url
@@ -660,7 +679,8 @@ const submitForm = async () => {
                     payload.proxy_target_app_port =
                         form.value.proxy_target_app_port
                 }
-            } else {
+            } 
+            if (form.value.site_types.includes('static')) {
                 payload.root_dir = form.value.root_dir
             }
 

@@ -33,7 +33,12 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(Websites::ServerType).string().not_null())
                     .col(ColumnDef::new(Websites::ServerInstanceId).string().null())
-                    .col(ColumnDef::new(Websites::SiteType).string().not_null())
+                    .col(
+                        ColumnDef::new(Websites::SiteTypes)
+                            .json()
+                            .not_null()
+                            .default("[]"),
+                    )
                     .col(ColumnDef::new(Websites::ProxyTargetType).string().null())
                     .col(ColumnDef::new(Websites::ProxyTargetUrl).string().null())
                     .col(ColumnDef::new(Websites::ProxyTargetAppId).string().null())
@@ -87,7 +92,7 @@ pub enum Websites {
     Aliases,
     ServerType,
     ServerInstanceId,
-    SiteType,
+    SiteTypes,
     ProxyTargetType,
     ProxyTargetUrl,
     ProxyTargetAppId,
