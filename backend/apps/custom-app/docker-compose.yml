@@ -1,0 +1,13 @@
+services:
+    app:
+        image: "${PANEL_APP_PARAM_IMAGE}"
+        container_name: "{{ app_name }}"
+        restart: unless-stopped
+        expose:
+            - "${PANEL_APP_PARAM_APP_PORT}"
+        volumes:
+            - "/opt/mana-panel/www:/opt/mana-panel/www"
+            - "./data:/data"
+            - "./config:/config"
+        env_file:
+            - .env

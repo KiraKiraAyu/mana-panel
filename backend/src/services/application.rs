@@ -603,6 +603,62 @@ impl ApplicationManager {
         self.compose.stop(&project).await
     }
 
+    pub async fn get_application_logs(&self, instance_id: &str, tail: usize) -> AppResult<DockerActionResponse> {
+        self.compose.ensure_available().await?;
+        let instance_id = Self::parse_instance_id(instance_id)?;
+        self.load_instance_meta(&instance_id)?;
+        let project = self.compose_project_for(&instance_id);
+        self.compose.logs(&project, tail).await
+    }
+
+    pub fn get_application_env(&self, instance_id: &str) -> AppResult<HashMap<String, String>> {
+        let instance_id = Self::parse_instance_id(instance_id)?;
+        self.load_instance_meta(&instance_id)?;
+        let env_path = self.instance_dir(&instance_id).join(".env");
+        
+        let content = fs::read_to_string(&env_path).unwrap_or_default();
+        let mut env_map = HashMap::new();
+        
+        for line in content.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            if let Some((k, v)) = line.split_once('=') {
+                env_map.insert(k.trim().to_string(), v.trim().to_string());
+            }
+        }
+        
+        Ok(env_map)
+    }
+
+    pub async fn update_application_env(
+        &self,
+        instance_id: &str,
+        env_map: HashMap<String, String>,
+        docker: Option<DockerService>,
+    ) -> AppResult<DockerActionResponse> {
+        let parsed_id = Self::parse_instance_id(instance_id)?;
+        self.load_instance_meta(&parsed_id)?;
+        
+        // 1. Write the new .env file
+        let env_path = self.instance_dir(&parsed_id).join(".env");
+        let mut entries: Vec<_> = env_map.into_iter().collect();
+        entries.sort_by(|a, b| a.0.cmp(&b.0));
+        let content = entries
+            .into_iter()
+            .map(|(k, v)| format!("{}={}", k, v))
+            .collect::<Vec<_>>()
+            .join("\n");
+            
+        fs::write(&env_path, content).map_err(|e| {
+            AppError::System(format!("Failed to write updated .env file: {}", e))
+        })?;
+        
+        // 2. Update the application to apply the new environment variables
+        self.update_application(instance_id, docker).await
+    }
+
     pub async fn update_application(
         &self,
         instance_id: &str,

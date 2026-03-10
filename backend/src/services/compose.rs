@@ -107,6 +107,16 @@ impl ComposeService {
         self.run_lifecycle(project, &args, "compose_down").await
     }
 
+    pub async fn logs(
+        &self,
+        project: &ComposeProject,
+        tail: usize,
+    ) -> AppResult<DockerActionResponse> {
+        let tail_str = tail.to_string();
+        self.run_lifecycle(project, &["logs", "--tail", &tail_str], "compose_logs")
+            .await
+    }
+
     pub async fn ps(&self, project: &ComposeProject) -> AppResult<Vec<ComposeContainerStatus>> {
         let output = self
             .run_compose(project, &["ps", "--format", "json"], "compose_ps")

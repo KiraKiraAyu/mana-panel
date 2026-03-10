@@ -193,4 +193,27 @@ export const applicationsApi = {
         })
         return response.data
     },
+
+    async logs(
+        instanceId: string,
+        tail: number = 500,
+    ): Promise<DockerActionResponse> {
+        const response = await api.get(`/applications/${instanceId}/logs`, {
+            params: { tail },
+        })
+        return response.data
+    },
+
+    async getEnv(instanceId: string): Promise<Record<string, string>> {
+        const response = await api.get(`/applications/${instanceId}/env`)
+        return response.data
+    },
+
+    async updateEnv(
+        instanceId: string,
+        envMap: Record<string, string>,
+    ): Promise<DockerActionResponse> {
+        const response = await api.post(`/applications/${instanceId}/env`, envMap)
+        return response.data
+    },
 }

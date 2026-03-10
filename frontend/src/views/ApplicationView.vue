@@ -97,6 +97,8 @@
                 @stop="stopApplication"
                 @update="updateApplication"
                 @remove="removeApplication"
+                @logs="openLogsModal"
+                @env="openEnvModal"
                 @switch-to-available="activeTab = 'available'"
             />
         </Transition>
@@ -115,6 +117,21 @@
             @close="closeInstallModal"
             @submit="installApplication"
         />
+
+        <ApplicationLogsModal
+            :open="logsModalOpen"
+            :app-id="logsAppId"
+            :app-name="logsAppName"
+            @close="logsModalOpen = false"
+        />
+
+        <ApplicationEnvModal
+            :open="envModalOpen"
+            :app-id="envAppId"
+            :app-name="envAppName"
+            @close="envModalOpen = false"
+            @updated="refreshAll"
+        />
     </div>
 </template>
 
@@ -130,6 +147,8 @@ import ApplicationHeader from '@/components/applications/ApplicationHeader.vue'
 import ApplicationTabs from '@/components/applications/ApplicationTabs.vue'
 import AvailableTemplatesTab from '@/components/applications/AvailableTemplatesTab.vue'
 import InstallApplicationModal from '@/components/applications/InstallApplicationModal.vue'
+import ApplicationLogsModal from '@/components/applications/ApplicationLogsModal.vue'
+import ApplicationEnvModal from '@/components/applications/ApplicationEnvModal.vue'
 import InstalledApplicationsTab from '@/components/applications/InstalledApplicationsTab.vue'
 import { useApplicationInstallForm } from '@/composables/useApplicationInstallForm'
 import { useApplicationsData } from '@/composables/useApplicationsData'
@@ -139,6 +158,26 @@ type ApplicationTab = 'installed' | 'available'
 const activeTab = ref<ApplicationTab>('available')
 const submitting = ref(false)
 const installStatusMessage = ref('')
+
+const logsModalOpen = ref(false)
+const logsAppId = ref<string | null>(null)
+const logsAppName = ref<string | null>(null)
+
+const openLogsModal = (id: string, name: string) => {
+    logsAppId.value = id
+    logsAppName.value = name
+    logsModalOpen.value = true
+}
+
+const envModalOpen = ref(false)
+const envAppId = ref<string | null>(null)
+const envAppName = ref<string | null>(null)
+
+const openEnvModal = (id: string, name: string) => {
+    envAppId.value = id
+    envAppName.value = name
+    envModalOpen.value = true
+}
 
 const {
     loading,

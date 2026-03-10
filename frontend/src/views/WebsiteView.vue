@@ -344,6 +344,18 @@
                         </div>
                     </div>
 
+                    <div
+                        class="p-3 bg-surface border border-reisa-lilac-500/20 text-reisa-lilac-500 rounded-lg text-sm flex gap-2"
+                    >
+                        <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <p>
+                            <strong>Automatic SSL:</strong> Caddy automatically provisions HTTPS (Let's Encrypt) 
+                            for your domains as long as you point your DNS records to this server's IP.
+                        </p>
+                    </div>
+
                     <!-- Reverse Proxy Config -->
                     <template v-if="form.site_types.includes('reverse_proxy')">
                         <!-- Target Type -->

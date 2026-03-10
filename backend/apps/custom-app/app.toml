@@ -1,0 +1,25 @@
+[metadata]
+id = "custom-app"
+name = "Custom Docker App"
+version = "1.0.0"
+category = "applications"
+description = "Deploy any custom Docker image using this generic template. Specify the image and internal container port to allow the Website Reverse Proxy to discover and route traffic to it."
+
+[[param]]
+key = "image"
+label = "Docker Image"
+description = "The fully qualified Docker image name (e.g., ghcr.io/user/repo:latest, myname/app:v1)."
+required = true
+default = "nginx:alpine"
+input = "text"
+placeholder = "nginx:alpine"
+
+[[param]]
+key = "app_port"
+label = "Container Port"
+description = "The internal port the application listens on (e.g., 80, 8080, 3000). The Website proxy will route traffic here."
+required = true
+default = "8080"
+input = "number"
+
+

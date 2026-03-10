@@ -1,0 +1,38 @@
+[metadata]
+id = "postgres"
+name = "PostgreSQL"
+version = "16.2.0"
+category = "databases"
+description = "PostgreSQL is a powerful, open source object-relational database system."
+
+[[param]]
+key = "POSTGRES_USER"
+label = "Database User"
+description = "The superuser account name"
+required = true
+default = "postgres"
+input = "text"
+
+[[param]]
+key = "POSTGRES_PASSWORD"
+label = "Database Password"
+description = "The password for the superuser"
+required = true
+default = ""
+input = "password"
+
+[[param]]
+key = "POSTGRES_DB"
+label = "Default Database"
+description = "Initialize this database on startup"
+required = true
+default = "postgres"
+input = "text"
+
+[[param]]
+key = "host_port"
+label = "Host Port (Optional)"
+description = "Port mapped to host for external access. Leave empty for internal access only."
+required = false
+default = "0"
+input = "number"

@@ -211,6 +211,38 @@
                     </button>
 
                     <button
+                        @click="$emit('logs', String(app.id), app.name)"
+                        title="Logs"
+                        class="p-2 text-text-secondary hover:text-success hover:bg-success/10 rounded-lg transition-colors"
+                        :disabled="loading"
+                    >
+                        <svg
+                            class="w-4 h-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                            />
+                        </svg>
+                    </button>
+
+                    <button
+                        @click="$emit('env', String(app.id), app.name)"
+                        title="Environment"
+                        class="p-2 text-text-secondary hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                        :disabled="loading"
+                    >
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                        </svg>
+                    </button>
+
+                    <button
                         @click="$emit('remove', String(app.id), app.name)"
                         title="Remove"
                         class="p-2 text-text-secondary hover:text-error hover:bg-error/10 rounded-lg transition-colors"
@@ -249,6 +281,8 @@ defineEmits<{
     (e: 'stop', id: string): void
     (e: 'update', id: string): void
     (e: 'remove', id: string, name: string): void
+    (e: 'logs', id: string, name: string): void
+    (e: 'env', id: string, name: string): void
     (e: 'switchToAvailable'): void
 }>()
 </script>

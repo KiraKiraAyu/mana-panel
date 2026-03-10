@@ -39,6 +39,8 @@ pub fn router() -> Router<AppState> {
         .route("/{id}/start", post(start_application))
         .route("/{id}/stop", post(stop_application))
         .route("/{id}/update", post(update_application))
+        .route("/{id}/logs", get(get_application_logs))
+        .route("/{id}/env", get(get_application_env).post(update_application_env))
         .route("/{id}", delete(remove_application))
 }
 
@@ -160,6 +162,41 @@ async fn update_application(
     let result = manager
         .update_application(&id, state.docker.clone())
         .await?;
+    Ok(Json(result))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct LogsQuery {
+    pub tail: Option<usize>,
+}
+
+async fn get_application_logs(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Query(query): Query<LogsQuery>,
+) -> AppResult<Json<DockerActionResponse>> {
+    let manager = manager_from_state(&state)?;
+    let tail = query.tail.unwrap_or(500);
+    let result = manager.get_application_logs(&id, tail).await?;
+    Ok(Json(result))
+}
+
+async fn get_application_env(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> AppResult<Json<std::collections::HashMap<String, String>>> {
+    let manager = manager_from_state(&state)?;
+    let result = manager.get_application_env(&id)?;
+    Ok(Json(result))
+}
+
+async fn update_application_env(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(env_map): Json<std::collections::HashMap<String, String>>,
+) -> AppResult<Json<DockerActionResponse>> {
+    let manager = manager_from_state(&state)?;
+    let result = manager.update_application_env(&id, env_map, state.docker.clone()).await?;
     Ok(Json(result))
 }
 
