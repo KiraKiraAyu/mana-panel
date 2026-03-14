@@ -1,52 +1,22 @@
 <template>
     <div class="p-6 space-y-6 animate-in">
-        <!-- Header -->
-        <div class="flex items-center justify-between">
-            <div>
-                <h1 class="text-2xl font-bold text-text-primary">Websites</h1>
-                <p class="text-text-muted mt-1">
-                    Manage reverse proxy sites and HTTPS
-                </p>
-            </div>
-            <div class="flex gap-2">
-                <button
-                    @click="fetchWebsites"
-                    class="btn btn-ghost"
-                    :disabled="loading"
+        <div class="flex flex-row-reverse items-center justify-between">
+            <button @click="showCreate = true" class="btn btn-primary">
+                <svg
+                    class="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
                 >
-                    <svg
-                        class="w-4 h-4"
-                        :class="{ 'animate-spin': loading }"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                        />
-                    </svg>
-                    Refresh
-                </button>
-                <button @click="showCreate = true" class="btn btn-primary">
-                    <svg
-                        class="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M12 4v16m8-8H4"
-                        />
-                    </svg>
-                    New Website
-                </button>
-            </div>
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M12 4v16m8-8H4"
+                    />
+                </svg>
+                New Website
+            </button>
         </div>
 
         <!-- Website List -->
@@ -93,9 +63,16 @@
                         serverInstanceLabel(site)
                     }}</span>
                     <span class="flex items-center gap-1">
-                        <template v-for="(type, index) in site.site_types" :key="type">
+                        <template
+                            v-for="(type, index) in site.site_types"
+                            :key="type"
+                        >
                             <span>{{ siteTypeLabel(type) }}</span>
-                            <span v-if="index < site.site_types.length - 1" class="text-text-muted/50">+</span>
+                            <span
+                                v-if="index < site.site_types.length - 1"
+                                class="text-text-muted/50"
+                                >+</span
+                            >
                         </template>
                     </span>
                     <template v-if="site.site_types.includes('reverse_proxy')">
@@ -321,25 +298,33 @@
                             >Site Modes</label
                         >
                         <div class="space-y-2">
-                            <label class="flex items-center gap-2 cursor-pointer">
-                                <input 
-                                    type="checkbox" 
-                                    value="reverse_proxy" 
-                                    v-model="form.site_types" 
+                            <label
+                                class="flex items-center gap-2 cursor-pointer"
+                            >
+                                <input
+                                    type="checkbox"
+                                    value="reverse_proxy"
+                                    v-model="form.site_types"
                                     class="checkbox checkbox-primary"
                                     :disabled="!!editingSite"
+                                />
+                                <span class="text-sm text-text-primary"
+                                    >Reverse Proxy</span
                                 >
-                                <span class="text-sm text-text-primary">Reverse Proxy</span>
                             </label>
-                            <label class="flex items-center gap-2 cursor-pointer">
-                                <input 
-                                    type="checkbox" 
-                                    value="static" 
-                                    v-model="form.site_types" 
+                            <label
+                                class="flex items-center gap-2 cursor-pointer"
+                            >
+                                <input
+                                    type="checkbox"
+                                    value="static"
+                                    v-model="form.site_types"
                                     class="checkbox checkbox-primary"
                                     :disabled="!!editingSite"
+                                />
+                                <span class="text-sm text-text-primary"
+                                    >Static Site</span
                                 >
-                                <span class="text-sm text-text-primary">Static Site</span>
                             </label>
                         </div>
                     </div>
@@ -347,12 +332,24 @@
                     <div
                         class="p-3 bg-surface border border-reisa-lilac-500/20 text-reisa-lilac-500 rounded-lg text-sm flex gap-2"
                     >
-                        <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <svg
+                            class="w-5 h-5 shrink-0"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                            />
                         </svg>
                         <p>
-                            <strong>Automatic SSL:</strong> Caddy automatically provisions HTTPS (Let's Encrypt) 
-                            for your domains as long as you point your DNS records to this server's IP.
+                            <strong>Automatic SSL:</strong> Caddy automatically
+                            provisions HTTPS (Let's Encrypt) for your domains as
+                            long as you point your DNS records to this server's
+                            IP.
                         </p>
                     </div>
 
@@ -691,7 +688,7 @@ const submitForm = async () => {
                     payload.proxy_target_app_port =
                         form.value.proxy_target_app_port
                 }
-            } 
+            }
             if (form.value.site_types.includes('static')) {
                 payload.root_dir = form.value.root_dir
             }

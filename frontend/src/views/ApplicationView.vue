@@ -1,23 +1,7 @@
 <template>
     <div
-        class="max-w-7xl mx-auto p-4 md:p-6 space-y-8 animate-in fade-in duration-500"
+        class="w-full h-full p-4 md:p-6 space-y-8 animate-in fade-in duration-500"
     >
-        <ApplicationHeader
-            :loading="loading"
-            :submitting="submitting"
-            :docker-available="dockerAvailable"
-            @refresh="refreshAll"
-        />
-
-        <div class="flex justify-end">
-            <RouterLink
-                to="/applications/tasks"
-                class="btn btn-sm btn-ghost border border-border hover:border-reisa-lilac-500/40 text-text-secondary hover:text-text-primary"
-            >
-                View Task Output
-            </RouterLink>
-        </div>
-
         <ApplicationTabs
             :active-tab="activeTab"
             :installed-count="instances.length"
@@ -137,13 +121,11 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { RouterLink } from 'vue-router'
 
 import {
     applicationsApi,
     type InstallApplicationRequest,
 } from '@/api/applications'
-import ApplicationHeader from '@/components/applications/ApplicationHeader.vue'
 import ApplicationTabs from '@/components/applications/ApplicationTabs.vue'
 import AvailableTemplatesTab from '@/components/applications/AvailableTemplatesTab.vue'
 import InstallApplicationModal from '@/components/applications/InstallApplicationModal.vue'

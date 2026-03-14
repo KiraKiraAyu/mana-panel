@@ -1,33 +1,5 @@
 <template>
     <div class="p-6 space-y-6 animate-in">
-        <!-- Header -->
-        <div class="flex items-center justify-between">
-            <div>
-                <h1 class="text-2xl font-bold text-text-primary">Docker</h1>
-                <p class="text-text-muted mt-1">Manage containers and images</p>
-            </div>
-            <div class="flex items-center gap-2">
-                <span
-                    class="flex items-center gap-2 text-sm"
-                    :class="dockerAvailable ? 'text-success' : 'text-error'"
-                >
-                    <span
-                        class="w-2 h-2 rounded-full"
-                        :class="
-                            dockerAvailable
-                                ? 'bg-success animate-pulse'
-                                : 'bg-error'
-                        "
-                    ></span>
-                    {{
-                        dockerAvailable
-                            ? 'Docker Connected'
-                            : 'Docker Unavailable'
-                    }}
-                </span>
-            </div>
-        </div>
-
         <!-- Tabs -->
         <div class="flex items-center gap-1 p-1 bg-surface rounded-xl w-fit">
             <button

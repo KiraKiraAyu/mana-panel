@@ -1,54 +1,12 @@
 <template>
-    <div
-        class="max-w-7xl mx-auto p-4 md:p-6 space-y-6 animate-in fade-in duration-500"
-    >
-        <div
-            class="flex flex-col md:flex-row md:items-end justify-between gap-4"
-        >
-            <div>
-                <h1 class="text-3xl font-bold text-text-primary tracking-tight">
-                    Application Tasks
-                </h1>
-                <p class="text-text-muted mt-2 text-sm md:text-base max-w-2xl">
-                    Real-time install task output and status updates via SSE.
-                </p>
-            </div>
-
-            <div class="flex items-center gap-2">
-                <span
-                    class="px-2.5 py-1 rounded-full text-xs border"
-                    :class="
-                        listConnected
-                            ? 'bg-success/10 text-success border-success/30'
-                            : 'bg-warning/10 text-warning border-warning/30'
-                    "
-                >
-                    List: {{ listConnected ? 'Connected' : 'Reconnecting' }}
-                </span>
-                <span
-                    class="px-2.5 py-1 rounded-full text-xs border"
-                    :class="
-                        detailConnected
-                            ? 'bg-success/10 text-success border-success/30'
-                            : 'bg-warning/10 text-warning border-warning/30'
-                    "
-                >
-                    Output: {{ detailConnected ? 'Connected' : 'Reconnecting' }}
-                </span>
-                <RouterLink
-                    to="/applications"
-                    class="btn btn-sm btn-ghost border border-border hover:border-reisa-lilac-500/40 text-text-secondary hover:text-text-primary"
-                >
-                    Back
-                </RouterLink>
-            </div>
-        </div>
-
-        <div
-            v-if="error"
-            class="p-3 rounded-xl bg-error/10 border border-error/20 text-error text-sm"
-        >
-            {{ error }}
+    <div class="w-full p-4 md:p-6 space-y-6 animate-in fade-in duration-500">
+        <div class="h-8">
+            <RouterLink
+                to="/applications"
+                class="text-sm text-text-secondary hover:text-text-primary transition-colors duration-300"
+            >
+                <- Back
+            </RouterLink>
         </div>
 
         <div class="grid grid-cols-1 xl:grid-cols-[340px_1fr] gap-4">
@@ -208,6 +166,7 @@
 <script setup lang="ts">
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+import { useConnectionStore } from '@/stores/connection'
 
 import {
     applicationsApi,
@@ -223,6 +182,7 @@ const error = ref('')
 const tasks = ref<ApplicationTask[]>([])
 const selectedTaskId = ref('')
 const selectedTask = ref<ApplicationTask | null>(null)
+const connectionStore = useConnectionStore()
 const listConnected = ref(false)
 const detailConnected = ref(false)
 const isUnmounted = ref(false)
@@ -513,7 +473,18 @@ onMounted(async () => {
     connectDetailStream()
 })
 
+watch(
+    [listConnected, detailConnected],
+    ([list, detail]) => {
+        if (list && detail) connectionStore.set('connected')
+        else if (!list && !detail) connectionStore.set('connecting')
+        else connectionStore.set('connecting')
+    },
+    { immediate: true },
+)
+
 onUnmounted(() => {
+    connectionStore.clear()
     isUnmounted.value = true
     listSessionId += 1
     detailSessionId += 1

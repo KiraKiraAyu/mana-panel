@@ -4,12 +4,6 @@
     >
         <!-- Header -->
         <div class="flex items-center justify-between">
-            <div>
-                <h1 class="text-2xl font-bold text-text-primary">Files</h1>
-                <p class="text-text-muted mt-1">
-                    Browse and manage server files
-                </p>
-            </div>
             <div class="flex items-center gap-2">
                 <input
                     ref="uploadInput"

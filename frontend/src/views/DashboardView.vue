@@ -2,29 +2,6 @@
     <div
         class="p-6 space-y-6 animate-[fade-in_0.3s_ease-out,slide-up_0.3s_ease-out]"
     >
-        <!-- Header -->
-        <div class="flex items-center justify-between">
-            <div>
-                <h1 class="text-2xl font-bold text-text-primary">Dashboard</h1>
-                <p class="text-text-muted mt-1">
-                    System overview and real-time monitoring
-                </p>
-            </div>
-            <div class="flex items-center gap-2">
-                <span
-                    class="w-2 h-2 rounded-full"
-                    :class="
-                        systemStore.isConnected
-                            ? 'bg-success animate-pulse'
-                            : 'bg-error'
-                    "
-                ></span>
-                <span class="text-sm text-text-secondary">
-                    {{ systemStore.isConnected ? 'Live' : 'Disconnected' }}
-                </span>
-            </div>
-        </div>
-
         <!-- System Info Cards -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <!-- CPU Card -->
@@ -359,8 +336,9 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, computed } from 'vue'
+import { onMounted, onUnmounted, watch, computed } from 'vue'
 import { useSystemStore } from '@/stores/system'
+import { useConnectionStore } from '@/stores/connection'
 import { Line } from 'vue-chartjs'
 import {
     Chart as ChartJS,
@@ -386,9 +364,20 @@ ChartJS.register(
 )
 
 const systemStore = useSystemStore()
+const connectionStore = useConnectionStore()
+
+watch(
+    () => systemStore.isConnected,
+    (v) => connectionStore.set(v ? 'connected' : 'connecting'),
+    { immediate: true },
+)
 
 onMounted(() => {
     systemStore.fetchStats()
+})
+
+onUnmounted(() => {
+    connectionStore.clear()
 })
 
 const formatBytes = (bytes: number) => {

@@ -24,12 +24,31 @@
                             />
                         </svg>
                     </div>
-                    <div>
+                    <div class="flex-1 min-w-0">
                         <h1 class="text-lg font-bold gradient-text">
                             Mana Panel
                         </h1>
                         <p class="text-xs text-text-muted">{{ hostname }}</p>
                     </div>
+                    <button
+                        @click="handleLogout"
+                        class="p-1.5 rounded-lg hover:bg-surface-elevated text-text-muted hover:text-text-primary transition-colors"
+                        title="Logout"
+                    >
+                        <svg
+                            class="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                            />
+                        </svg>
+                    </button>
                 </div>
             </div>
 
@@ -206,46 +225,44 @@
                 </RouterLink>
             </nav>
 
-            <!-- User Section -->
-            <div class="p-4 border-t border-border-subtle">
-                <div class="flex items-center gap-3">
-                    <div
-                        class="w-8 h-8 rounded-full bg-linear-to-br from-reisa-lilac-400 to-reisa-pink-400 flex items-center justify-center text-white text-sm font-medium"
-                    >
-                        {{
-                            authStore.user?.username?.charAt(0).toUpperCase() ||
-                            'A'
-                        }}
+            <!-- Connectivity Status -->
+            <Transition name="conn">
+                <div
+                    v-if="connectionStore.status !== null"
+                    class="p-4 border-t border-border-subtle"
+                >
+                    <div class="flex items-center gap-3">
+                        <div class="relative flex items-center justify-center w-8 h-8">
+                            <!-- Ping ring for connected state -->
+                            <span
+                                v-if="connectionStore.status === 'connected'"
+                                class="absolute inline-flex w-3 h-3 rounded-full bg-success opacity-60 animate-ping"
+                            ></span>
+                            <!-- Core dot -->
+                            <span
+                                class="relative inline-flex w-2.5 h-2.5 rounded-full transition-colors duration-300"
+                                :class="{
+                                    'bg-success': connectionStore.status === 'connected',
+                                    'bg-warning animate-pulse': connectionStore.status === 'connecting',
+                                    'bg-error': connectionStore.status === 'disconnected',
+                                }"
+                            ></span>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium text-text-primary">
+                                {{
+                                    connectionStore.status === 'connected'
+                                        ? 'Connected'
+                                        : connectionStore.status === 'connecting'
+                                          ? 'Connecting…'
+                                          : 'Disconnected'
+                                }}
+                            </p>
+                            <p class="text-xs text-text-muted">Live stream</p>
+                        </div>
                     </div>
-                    <div class="flex-1 min-w-0">
-                        <p
-                            class="text-sm font-medium text-text-primary truncate"
-                        >
-                            {{ authStore.user?.username || 'Admin' }}
-                        </p>
-                        <p class="text-xs text-text-muted">Administrator</p>
-                    </div>
-                    <button
-                        @click="handleLogout"
-                        class="p-2 rounded-lg hover:bg-surface-elevated text-text-muted hover:text-text-primary transition-colors"
-                        title="Logout"
-                    >
-                        <svg
-                            class="w-5 h-5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                            />
-                        </svg>
-                    </button>
                 </div>
-            </div>
+            </Transition>
         </aside>
 
         <!-- Main Content -->
@@ -259,12 +276,14 @@
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useSystemStore } from '@/stores/system'
+import { useConnectionStore } from '@/stores/connection'
 import { onMounted, onUnmounted, computed } from 'vue'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const systemStore = useSystemStore()
+const connectionStore = useConnectionStore()
 
 const navigateImmediate = (path: string) => {
     if (route.path === path) return
@@ -309,3 +328,17 @@ onUnmounted(() => {
 
 const hostname = computed(() => systemStore.info?.hostname || 'Server')
 </script>
+
+<style scoped>
+.conn-enter-active,
+.conn-leave-active {
+    transition:
+        opacity 0.25s ease,
+        transform 0.25s ease;
+}
+.conn-enter-from,
+.conn-leave-to {
+    opacity: 0;
+    transform: translateY(8px);
+}
+</style>

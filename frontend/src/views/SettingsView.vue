@@ -1,13 +1,5 @@
 <template>
     <div class="p-6 space-y-6 animate-in">
-        <!-- Header -->
-        <div>
-            <h1 class="text-2xl font-bold text-text-primary">Settings</h1>
-            <p class="text-text-muted mt-1">
-                Manage your account and preferences
-            </p>
-        </div>
-
         <!-- Account Section -->
         <div class="card">
             <h2 class="text-lg font-semibold text-text-primary mb-4">

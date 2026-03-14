@@ -1,51 +1,5 @@
 <template>
     <div class="p-6 space-y-6 animate-in">
-        <!-- Header -->
-        <div class="flex items-center justify-between">
-            <div>
-                <h1 class="text-2xl font-bold text-text-primary">Processes</h1>
-                <p class="text-text-muted mt-1">
-                    Manage running system processes
-                </p>
-            </div>
-            <div class="flex items-center gap-2">
-                <span
-                    class="text-xs"
-                    :class="sseConnected ? 'text-success' : 'text-warning'"
-                >
-                    Stream: {{ sseConnected ? 'Connected' : 'Reconnecting...' }}
-                </span>
-                <button
-                    @click="reconnectStream"
-                    class="btn btn-ghost btn-sm"
-                    :disabled="loading"
-                >
-                    Reconnect
-                </button>
-                <button
-                    @click="refreshNow"
-                    class="btn btn-ghost"
-                    :disabled="loading"
-                >
-                    <svg
-                        class="w-4 h-4"
-                        :class="{ 'animate-spin': loading }"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                        />
-                    </svg>
-                    Refresh
-                </button>
-            </div>
-        </div>
-
         <!-- Search & Filters -->
         <div
             class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4"
@@ -397,8 +351,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { api } from '@/api'
+import { useConnectionStore } from '@/stores/connection'
 
 interface Process {
     pid: number
@@ -417,6 +372,7 @@ const searchQuery = ref('')
 const statusFilter = ref('all')
 const sortBy = ref<'cpu' | 'memory' | 'name' | 'pid'>('cpu')
 const sortOrder = ref<'asc' | 'desc'>('desc')
+const connectionStore = useConnectionStore()
 const sseConnected = ref(false)
 const reconnectAttempts = ref(0)
 const lastUpdateTime = ref('')
@@ -650,14 +606,14 @@ const getCpuBarClass = (usage: number): string => {
 
 const getStatusBadgeClass = (status: string): string => {
     const statusMap: Record<string, string> = {
-        Run: "badge-success",
-        Sleep: "badge-info",
-        Stop: "badge-warning",
-        Zombie: "badge-error",
-        Idle: "badge-secondary",
-    };
-    return statusMap[status] || "badge-secondary";
-};
+        Run: 'badge-success',
+        Sleep: 'badge-info',
+        Stop: 'badge-warning',
+        Zombie: 'badge-error',
+        Idle: 'badge-secondary',
+    }
+    return statusMap[status] || 'badge-secondary'
+}
 
 const getCommandPreview = (cmd: string[]): string => {
     const fullCmd = cmd.join(' ')
@@ -684,6 +640,14 @@ const clearSearch = () => {
     restartProcessStream()
 }
 
+watch(
+    sseConnected,
+    (v) => connectionStore.set(v ? 'connected' : 'connecting'),
+    {
+        immediate: true,
+    },
+)
+
 onMounted(() => {
     isUnmounted.value = false
     fetchProcesses()
@@ -691,6 +655,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+    connectionStore.clear()
     isUnmounted.value = true
     streamSessionId += 1
     disconnectProcessStream()
