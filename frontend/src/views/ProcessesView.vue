@@ -1,315 +1,157 @@
 <template>
     <div class="p-6 space-y-6 animate-in">
-        <!-- Search & Filters -->
-        <div
-            class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4"
+        <ListToolbar
+            v-model:searchQuery="searchQuery"
+            v-model:filterValue="statusFilter"
+            :filterOptions="statusFilterOptions"
+            :filteredCount="filteredCount"
+            :totalCount="totalCount"
+            itemLabel="processes"
+            @search="debouncedSearch"
+        />
+
+        <DataTable
+            :columns="tableColumns"
+            :loading="loading"
+            :empty="displayedProcesses.length === 0"
+            emptyText="No processes found matching your criteria"
+            :sortBy="sortBy"
+            :sortOrder="sortOrder"
+            @sort="toggleSort"
         >
-            <BaseInput
-                v-model="searchQuery"
-                @input="debouncedSearch"
-                variant="search"
-            />
-
-            <div class="flex items-center gap-2">
-                <select v-model="statusFilter" class="input">
-                    <option value="all">All Status</option>
-                    <option value="Run">Running</option>
-                    <option value="Sleep">Sleeping</option>
-                    <option value="Stop">Stopped</option>
-                    <option value="Zombie">Zombie</option>
-                </select>
-
-                <span class="text-sm text-text-muted whitespace-nowrap">
-                    {{ filteredCount }} of {{ totalCount }} processes
-                </span>
-            </div>
-        </div>
-
-        <!-- Process Table -->
-        <div class="p-0 overflow-hidden">
-            <div class="overflow-x-auto">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th
-                                class="cursor-pointer hover:text-text-primary select-none"
-                                @click="toggleSort('pid')"
+            <template #rows>
+                <tr
+                    v-for="process in displayedProcesses"
+                    :key="process.pid"
+                    class="hover:bg-bg-tertiary transition-colors"
+                >
+                    <td class="font-mono text-sm">{{ process.pid }}</td>
+                    <td>
+                        <div class="max-w-xs">
+                            <div
+                                class="font-medium text-text-primary truncate"
                             >
-                                <div class="flex items-center gap-1">
-                                    PID
-                                    <svg
-                                        v-if="sortBy === 'pid'"
-                                        class="w-4 h-4"
-                                        :class="{
-                                            'rotate-180': sortOrder === 'desc',
-                                        }"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="2"
-                                            d="M5 15l7-7 7 7"
-                                        />
-                                    </svg>
-                                </div>
-                            </th>
-                            <th
-                                class="cursor-pointer hover:text-text-primary select-none"
-                                @click="toggleSort('name')"
+                                {{ process.name }}
+                            </div>
+                            <div
+                                v-if="process.cmd.length > 0"
+                                class="text-xs text-text-muted font-mono truncate"
+                                :title="process.cmd.join(' ')"
                             >
-                                <div class="flex items-center gap-1">
-                                    Name
-                                    <svg
-                                        v-if="sortBy === 'name'"
-                                        class="w-4 h-4"
-                                        :class="{
-                                            'rotate-180': sortOrder === 'desc',
-                                        }"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="2"
-                                            d="M5 15l7-7 7 7"
-                                        />
-                                    </svg>
-                                </div>
-                            </th>
-                            <th
-                                class="cursor-pointer hover:text-text-primary select-none"
-                                @click="toggleSort('cpu')"
+                                {{ getCommandPreview(process.cmd) }}
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="flex items-center gap-2">
+                            <span
+                                class="font-mono text-sm"
+                                :class="getCpuColorClass(process.cpu_usage)"
                             >
-                                <div class="flex items-center gap-1">
-                                    CPU
-                                    <svg
-                                        v-if="sortBy === 'cpu'"
-                                        class="w-4 h-4"
-                                        :class="{
-                                            'rotate-180': sortOrder === 'desc',
-                                        }"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="2"
-                                            d="M5 15l7-7 7 7"
-                                        />
-                                    </svg>
-                                </div>
-                            </th>
-                            <th
-                                class="cursor-pointer hover:text-text-primary select-none"
-                                @click="toggleSort('memory')"
+                                {{ process.cpu_usage.toFixed(1) }}%
+                            </span>
+                            <div
+                                class="w-16 h-1.5 bg-bg-tertiary rounded-full overflow-hidden"
                             >
-                                <div class="flex items-center gap-1">
-                                    Memory
-                                    <svg
-                                        v-if="sortBy === 'memory'"
-                                        class="w-4 h-4"
-                                        :class="{
-                                            'rotate-180': sortOrder === 'desc',
-                                        }"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="2"
-                                            d="M5 15l7-7 7 7"
-                                        />
-                                    </svg>
-                                </div>
-                            </th>
-                            <th>Status</th>
-                            <th>User</th>
-                            <th class="text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr
-                            v-for="process in displayedProcesses"
-                            :key="process.pid"
-                            class="hover:bg-bg-tertiary transition-colors"
-                        >
-                            <td class="font-mono text-sm">{{ process.pid }}</td>
-                            <td>
-                                <div class="max-w-xs">
-                                    <div
-                                        class="font-medium text-text-primary truncate"
-                                    >
-                                        {{ process.name }}
-                                    </div>
-                                    <div
-                                        v-if="process.cmd.length > 0"
-                                        class="text-xs text-text-muted font-mono truncate"
-                                        :title="process.cmd.join(' ')"
-                                    >
-                                        {{ getCommandPreview(process.cmd) }}
-                                    </div>
-                                </div>
-                            </td>
-                            <td>
-                                <div class="flex items-center gap-2">
-                                    <span
-                                        class="font-mono text-sm"
-                                        :class="
-                                            getCpuColorClass(process.cpu_usage)
-                                        "
-                                    >
-                                        {{ process.cpu_usage.toFixed(1) }}%
-                                    </span>
-                                    <div
-                                        class="w-16 h-1.5 bg-bg-tertiary rounded-full overflow-hidden"
-                                    >
-                                        <div
-                                            class="h-full rounded-full transition-all"
-                                            :class="
-                                                getCpuBarClass(
-                                                    process.cpu_usage,
-                                                )
-                                            "
-                                            :style="{
-                                                width:
-                                                    Math.min(
-                                                        process.cpu_usage,
-                                                        100,
-                                                    ) + '%',
-                                            }"
-                                        ></div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="font-mono text-sm">
-                                {{ formatBytes(process.memory) }}
-                            </td>
-                            <td>
-                                <span
-                                    class="badge text-xs"
-                                    :class="getStatusBadgeClass(process.status)"
-                                >
-                                    {{ process.status }}
-                                </span>
-                            </td>
-                            <td class="text-sm text-text-secondary">
-                                {{ process.user }}
-                            </td>
-                            <td>
                                 <div
-                                    class="flex items-center justify-end gap-1"
+                                    class="h-full rounded-full transition-all"
+                                    :class="getCpuBarClass(process.cpu_usage)"
+                                    :style="{
+                                        width:
+                                            Math.min(process.cpu_usage, 100) +
+                                            '%',
+                                    }"
+                                ></div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="font-mono text-sm">
+                        {{ formatBytes(process.memory) }}
+                    </td>
+                    <td>
+                        <span
+                            class="badge text-xs"
+                            :class="getStatusBadgeClass(process.status)"
+                        >
+                            {{ process.status }}
+                        </span>
+                    </td>
+                    <td class="text-sm text-text-secondary">
+                        {{ process.user }}
+                    </td>
+                    <td>
+                        <div class="flex items-center justify-end gap-1">
+                            <button
+                                v-if="process.status === 'Stop'"
+                                @click="resumeProcess(process.pid)"
+                                class="p-1.5 rounded-lg hover:bg-success/20 text-success transition-colors"
+                                title="Resume Process"
+                            >
+                                <svg
+                                    class="w-4 h-4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
                                 >
-                                    <button
-                                        v-if="process.status === 'Stop'"
-                                        @click="resumeProcess(process.pid)"
-                                        class="p-1.5 rounded-lg hover:bg-success/20 text-success transition-colors"
-                                        title="Resume Process"
-                                    >
-                                        <svg
-                                            class="w-4 h-4"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <path
-                                                stroke-linecap="round"
-                                                stroke-linejoin="round"
-                                                stroke-width="2"
-                                                d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-                                            />
-                                        </svg>
-                                    </button>
-                                    <button
-                                        v-else
-                                        @click="stopProcess(process.pid)"
-                                        class="p-1.5 rounded-lg hover:bg-warning/20 text-warning transition-colors"
-                                        title="Stop Process"
-                                    >
-                                        <svg
-                                            class="w-4 h-4"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <path
-                                                stroke-linecap="round"
-                                                stroke-linejoin="round"
-                                                stroke-width="2"
-                                                d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                                            />
-                                        </svg>
-                                    </button>
-                                    <button
-                                        @click="confirmKillProcess(process)"
-                                        class="p-1.5 rounded-lg hover:bg-error/20 text-error transition-colors"
-                                        title="Kill Process"
-                                    >
-                                        <svg
-                                            class="w-4 h-4"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <path
-                                                stroke-linecap="round"
-                                                stroke-linejoin="round"
-                                                stroke-width="2"
-                                                d="M6 18L18 6M6 6l12 12"
-                                            />
-                                        </svg>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+                                    />
+                                </svg>
+                            </button>
+                            <button
+                                v-else
+                                @click="stopProcess(process.pid)"
+                                class="p-1.5 rounded-lg hover:bg-warning/20 text-warning transition-colors"
+                                title="Stop Process"
+                            >
+                                <svg
+                                    class="w-4 h-4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                                    />
+                                </svg>
+                            </button>
+                            <button
+                                @click="confirmKillProcess(process)"
+                                class="p-1.5 rounded-lg hover:bg-error/20 text-error transition-colors"
+                                title="Kill Process"
+                            >
+                                <svg
+                                    class="w-4 h-4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M6 18L18 6M6 6l12 12"
+                                    />
+                                </svg>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            </template>
+        </DataTable>
 
-                <div
-                    v-if="loading && processes.length === 0"
-                    class="p-8 text-center"
-                >
-                    <div class="shimmer h-8 w-48 mx-auto rounded mb-4"></div>
-                    <div class="shimmer h-4 w-32 mx-auto rounded"></div>
-                </div>
-
-                <div
-                    v-if="!loading && displayedProcesses.length === 0"
-                    class="p-8 text-center text-text-muted"
-                >
-                    <svg
-                        class="w-12 h-12 mx-auto mb-2 opacity-50"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                    </svg>
-                    <p>No processes found matching your criteria</p>
-                </div>
-            </div>
-
-            <!-- Pagination (if needed in the future) -->
-            <div
-                v-if="displayedProcesses.length > 0"
-                class="px-6 py-3 border-t border-border flex items-center justify-between text-sm text-text-muted"
-            >
-                <div>Last updated: {{ lastUpdateTime }}</div>
-                <div>Showing {{ displayedProcesses.length }} processes</div>
-            </div>
+        <div
+            v-if="displayedProcesses.length > 0"
+            class="px-6 py-3 border-t border-border flex items-center justify-between text-sm text-text-muted"
+        >
+            <div>Last updated: {{ lastUpdateTime }}</div>
+            <div>Showing {{ displayedProcesses.length }} processes</div>
         </div>
     </div>
 </template>
@@ -318,7 +160,8 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { api } from '@/api'
 import { useConnectionStore } from '@/stores/connection'
-import BaseInput from '@/components/universal/BaseInput.vue'
+import ListToolbar from '@/components/universal/ListToolbar.vue'
+import DataTable from '@/components/universal/DataTable.vue'
 
 interface Process {
     pid: number
@@ -335,6 +178,23 @@ const processes = ref<Process[]>([])
 const loading = ref(false)
 const searchQuery = ref('')
 const statusFilter = ref('all')
+const tableColumns = [
+    { key: 'pid', label: 'PID', sortable: true },
+    { key: 'name', label: 'Name', sortable: true },
+    { key: 'cpu', label: 'CPU', sortable: true },
+    { key: 'memory', label: 'Memory', sortable: true },
+    { key: 'status', label: 'Status' },
+    { key: 'user', label: 'User' },
+    { key: 'actions', label: 'Actions', align: 'right' as const },
+]
+
+const statusFilterOptions = [
+    { value: 'all', label: 'All Status' },
+    { value: 'Run', label: 'Running' },
+    { value: 'Sleep', label: 'Sleeping' },
+    { value: 'Stop', label: 'Stopped' },
+    { value: 'Zombie', label: 'Zombie' },
+]
 const sortBy = ref<'cpu' | 'memory' | 'name' | 'pid'>('cpu')
 const sortOrder = ref<'asc' | 'desc'>('desc')
 const connectionStore = useConnectionStore()

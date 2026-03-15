@@ -1,131 +1,139 @@
 <template>
     <div class="p-6 space-y-6 animate-in">
-        <BaseInput v-model="searchQuery" variant="search" />
+        <ListToolbar
+            v-model:searchQuery="searchQuery"
+            v-model:filterValue="statusFilter"
+            :filterOptions="statusFilterOptions"
+            :filteredCount="filteredCount"
+            :totalCount="totalCount"
+            itemLabel="services"
+        />
 
-        <!-- Services Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div v-for="service in filteredServices()" :key="service.name">
-                <div class="flex items-start justify-between mb-3">
-                    <div class="flex-1 min-w-0">
-                        <h3 class="font-semibold text-text-primary truncate">
-                            {{ service.name }}
-                        </h3>
-                        <p class="text-sm text-text-muted truncate mt-1">
-                            {{ service.description }}
-                        </p>
-                    </div>
-                    <span :class="['badge', getStatusClass(service)]">
-                        {{ service.active_state }}
-                    </span>
-                </div>
-
-                <div
-                    class="flex items-center gap-2 text-xs text-text-muted mb-4"
-                >
-                    <span>{{ service.load_state }}</span>
-                    <span>•</span>
-                    <span>{{ service.sub_state }}</span>
-                </div>
-
-                <div class="flex items-center gap-2">
-                    <button
-                        v-if="service.active_state !== 'active'"
-                        @click="startService(service.name)"
-                        class="btn btn-ghost flex-1 text-success hover:bg-success/20"
-                    >
-                        <svg
-                            class="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-                            />
-                        </svg>
-                        Start
-                    </button>
-                    <button
-                        v-else
-                        @click="stopService(service.name)"
-                        class="btn btn-ghost flex-1 text-warning hover:bg-warning/20"
-                    >
-                        <svg
-                            class="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"
-                            />
-                        </svg>
-                        Stop
-                    </button>
-                    <button
-                        @click="restartService(service.name)"
-                        class="btn btn-ghost text-reisa-lilac-400 hover:bg-reisa-lilac-500/20"
-                        title="Restart"
-                    >
-                        <svg
-                            class="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                            />
-                        </svg>
-                    </button>
-                    <button
-                        @click="viewLogs(service)"
-                        class="btn btn-ghost text-reisa-stripe-400 hover:bg-reisa-stripe-500/20"
-                        title="View Logs"
-                    >
-                        <svg
-                            class="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                            />
-                        </svg>
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <div
-            v-if="loading && services.length === 0"
-            class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+        <DataTable
+            :columns="tableColumns"
+            :loading="loading"
+            :empty="filteredServices.length === 0"
+            emptyText="No services found matching your criteria"
         >
-            <div v-for="i in 6" :key="i">
-                <div class="shimmer h-6 w-32 rounded mb-2"></div>
-                <div class="shimmer h-4 w-48 rounded mb-4"></div>
-                <div class="shimmer h-8 w-full rounded"></div>
-            </div>
-        </div>
+            <template #rows>
+                <tr
+                    v-for="service in filteredServices"
+                    :key="service.name"
+                    class="hover:bg-bg-tertiary transition-colors"
+                >
+                    <td class="font-medium text-text-primary">
+                        {{ service.name }}
+                    </td>
+                    <td
+                        class="text-sm text-text-muted max-w-xs truncate"
+                        :title="service.description"
+                    >
+                        {{ service.description }}
+                    </td>
+                    <td class="text-sm text-text-secondary">
+                        {{ service.load_state }}
+                    </td>
+                    <td class="text-sm text-text-secondary">
+                        {{ service.sub_state }}
+                    </td>
+                    <td>
+                        <span
+                            :class="['badge text-xs', getStatusClass(service)]"
+                        >
+                            {{ service.active_state }}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="flex items-center justify-end gap-1">
+                            <button
+                                v-if="service.active_state !== 'active'"
+                                @click="startService(service.name)"
+                                class="p-1.5 rounded-lg hover:bg-success/20 text-success transition-colors"
+                                title="Start Service"
+                            >
+                                <svg
+                                    class="w-4 h-4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+                                    />
+                                </svg>
+                            </button>
+                            <button
+                                v-else
+                                @click="stopService(service.name)"
+                                class="p-1.5 rounded-lg hover:bg-warning/20 text-warning transition-colors"
+                                title="Stop Service"
+                            >
+                                <svg
+                                    class="w-4 h-4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                    />
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"
+                                    />
+                                </svg>
+                            </button>
+                            <button
+                                @click="restartService(service.name)"
+                                class="p-1.5 rounded-lg hover:bg-reisa-lilac-500/20 text-reisa-lilac-400 transition-colors"
+                                title="Restart Service"
+                            >
+                                <svg
+                                    class="w-4 h-4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                                    />
+                                </svg>
+                            </button>
+                            <button
+                                @click="viewLogs(service)"
+                                class="p-1.5 rounded-lg hover:bg-reisa-stripe-500/20 text-reisa-stripe-400 transition-colors"
+                                title="View Logs"
+                            >
+                                <svg
+                                    class="w-4 h-4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                    />
+                                </svg>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            </template>
+        </DataTable>
 
         <!-- Logs Modal -->
         <div
@@ -166,9 +174,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { api } from '@/api'
-import BaseInput from '@/components/universal/BaseInput.vue'
+import ListToolbar from '@/components/universal/ListToolbar.vue'
+import DataTable from '@/components/universal/DataTable.vue'
 
 interface Service {
     name: string
@@ -181,9 +190,48 @@ interface Service {
 const services = ref<Service[]>([])
 const loading = ref(false)
 const searchQuery = ref('')
+const statusFilter = ref('all')
 const selectedService = ref<Service | null>(null)
 const logs = ref<string[]>([])
 const showLogs = ref(false)
+
+const tableColumns = [
+    { key: 'name', label: 'Name' },
+    { key: 'description', label: 'Description' },
+    { key: 'load_state', label: 'Load State' },
+    { key: 'sub_state', label: 'Sub State' },
+    { key: 'status', label: 'Status' },
+    { key: 'actions', label: 'Actions', align: 'right' as const },
+]
+
+const statusFilterOptions = [
+    { value: 'all', label: 'All Status' },
+    { value: 'active', label: 'Active' },
+    { value: 'inactive', label: 'Inactive' },
+    { value: 'failed', label: 'Failed' },
+]
+
+const filteredServices = computed(() => {
+    let result = services.value
+
+    if (statusFilter.value !== 'all') {
+        result = result.filter((s) => s.active_state === statusFilter.value)
+    }
+
+    if (searchQuery.value) {
+        const query = searchQuery.value.toLowerCase()
+        result = result.filter(
+            (s) =>
+                s.name.toLowerCase().includes(query) ||
+                s.description.toLowerCase().includes(query),
+        )
+    }
+
+    return result
+})
+
+const totalCount = computed(() => services.value.length)
+const filteredCount = computed(() => filteredServices.value.length)
 
 const fetchServices = async () => {
     loading.value = true
@@ -236,16 +284,6 @@ const viewLogs = async (service: Service) => {
     } catch (e: any) {
         alert(e.response?.data?.error?.message || 'Failed to fetch logs')
     }
-}
-
-const filteredServices = () => {
-    if (!searchQuery.value) return services.value
-    const query = searchQuery.value.toLowerCase()
-    return services.value.filter(
-        (s) =>
-            s.name.toLowerCase().includes(query) ||
-            s.description.toLowerCase().includes(query),
-    )
 }
 
 const getStatusClass = (service: Service) => {

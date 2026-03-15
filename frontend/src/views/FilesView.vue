@@ -42,34 +42,113 @@
         </div>
 
         <!-- File List -->
-        <div
-            class="overflow-hidden rounded-xl border border-border-subtle bg-surface-elevated"
+        <DataTable
+            :columns="tableColumns"
+            :loading="loading"
+            :empty="files.length === 0"
+            emptyText="This directory is empty"
         >
-            <table
-                class="w-full border-collapse [&_th]:border-b [&_th]:border-border-subtle [&_th]:bg-surface [&_th]:px-4 [&_th]:py-3.5 [&_th]:text-left [&_th]:text-xs [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-text-muted [&_td]:border-b [&_td]:border-border-subtle [&_td]:px-4 [&_td]:py-3.5 [&_td]:text-left [&_tbody_tr]:transition-colors [&_tbody_tr:hover]:bg-surface-elevated"
-            >
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Size</th>
-                        <th>Modified</th>
-                        <th>Permissions</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Parent Directory -->
-                    <tr
-                        v-if="currentPath !== '/'"
-                        @click="navigateUp"
-                        class="cursor-pointer"
-                    >
-                        <td class="flex items-center gap-3">
-                            <div
-                                class="w-8 h-8 rounded-lg bg-reisa-stripe-500/20 flex items-center justify-center"
+            <template #rows>
+                <!-- Parent Directory -->
+                <tr
+                    v-if="currentPath !== '/'"
+                    @click="navigateUp"
+                    class="cursor-pointer hover:bg-bg-tertiary transition-colors"
+                >
+                    <td class="flex items-center gap-3">
+                        <div
+                            class="w-8 h-8 rounded-lg bg-reisa-stripe-500/20 flex items-center justify-center"
+                        >
+                            <svg
+                                class="w-4 h-4 text-reisa-stripe-400"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M11 17l-5-5m0 0l5-5m-5 5h12"
+                                />
+                            </svg>
+                        </div>
+                        <span class="font-medium">..</span>
+                    </td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                </tr>
+
+                <!-- Files -->
+                <tr
+                    v-for="file in files"
+                    :key="file.path"
+                    @dblclick="openFile(file)"
+                    class="cursor-pointer hover:bg-bg-tertiary transition-colors"
+                >
+                    <td class="flex items-center gap-3">
+                        <div
+                            class="w-8 h-8 rounded-lg flex items-center justify-center"
+                            :class="
+                                file.is_dir
+                                    ? 'bg-reisa-gold-500/20'
+                                    : 'bg-reisa-lilac-500/20'
+                            "
+                        >
+                            <svg
+                                v-if="file.is_dir"
+                                class="w-4 h-4 text-reisa-gold-400"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+                                />
+                            </svg>
+                            <svg
+                                v-else
+                                class="w-4 h-4 text-reisa-lilac-400"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                />
+                            </svg>
+                        </div>
+                        <span class="font-medium text-text-primary">{{
+                            file.name
+                        }}</span>
+                    </td>
+                    <td class="text-text-secondary">
+                        {{ file.is_dir ? '-' : formatBytes(file.size) }}
+                    </td>
+                    <td class="text-text-secondary text-sm">
+                        {{ formatDate(file.modified) }}
+                    </td>
+                    <td class="font-mono text-sm text-text-muted">
+                        {{ file.permissions }}
+                    </td>
+                    <td>
+                        <div class="flex items-center gap-1">
+                            <button
+                                v-if="!file.is_dir"
+                                @click.stop="downloadFile(file)"
+                                class="p-1.5 rounded-lg hover:bg-reisa-lilac-500/20 text-reisa-lilac-400 transition-colors"
+                                title="Download"
                             >
                                 <svg
-                                    class="w-4 h-4 text-reisa-stripe-400"
+                                    class="w-4 h-4"
                                     fill="none"
                                     stroke="currentColor"
                                     viewBox="0 0 24 24"
@@ -78,38 +157,17 @@
                                         stroke-linecap="round"
                                         stroke-linejoin="round"
                                         stroke-width="2"
-                                        d="M11 17l-5-5m0 0l5-5m-5 5h12"
+                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                                     />
                                 </svg>
-                            </div>
-                            <span class="font-medium">..</span>
-                        </td>
-                        <td>-</td>
-                        <td>-</td>
-                        <td>-</td>
-                        <td>-</td>
-                    </tr>
-
-                    <!-- Files -->
-                    <tr
-                        v-for="file in files"
-                        :key="file.path"
-                        @dblclick="openFile(file)"
-                        class="cursor-pointer"
-                    >
-                        <td class="flex items-center gap-3">
-                            <div
-                                class="w-8 h-8 rounded-lg flex items-center justify-center"
-                                :class="
-                                    file.is_dir
-                                        ? 'bg-reisa-gold-500/20'
-                                        : 'bg-reisa-lilac-500/20'
-                                "
+                            </button>
+                            <button
+                                @click.stop="deleteFile(file)"
+                                class="p-1.5 rounded-lg hover:bg-error/20 text-error transition-colors"
+                                title="Delete"
                             >
-                                <!-- Folder Icon -->
                                 <svg
-                                    v-if="file.is_dir"
-                                    class="w-4 h-4 text-reisa-gold-400"
+                                    class="w-4 h-4"
                                     fill="none"
                                     stroke="currentColor"
                                     viewBox="0 0 24 24"
@@ -118,98 +176,15 @@
                                         stroke-linecap="round"
                                         stroke-linejoin="round"
                                         stroke-width="2"
-                                        d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                                     />
                                 </svg>
-                                <!-- File Icon -->
-                                <svg
-                                    v-else
-                                    class="w-4 h-4 text-reisa-lilac-400"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        stroke-width="2"
-                                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                                    />
-                                </svg>
-                            </div>
-                            <span class="font-medium text-text-primary">{{
-                                file.name
-                            }}</span>
-                        </td>
-                        <td class="text-text-secondary">
-                            {{ file.is_dir ? '-' : formatBytes(file.size) }}
-                        </td>
-                        <td class="text-text-secondary text-sm">
-                            {{ formatDate(file.modified) }}
-                        </td>
-                        <td class="font-mono text-sm text-text-muted">
-                            {{ file.permissions }}
-                        </td>
-                        <td>
-                            <div class="flex items-center gap-1">
-                                <button
-                                    v-if="!file.is_dir"
-                                    @click.stop="downloadFile(file)"
-                                    class="p-1.5 rounded-lg hover:bg-reisa-lilac-500/20 text-reisa-lilac-400 transition-colors"
-                                    title="Download"
-                                >
-                                    <svg
-                                        class="w-4 h-4"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="2"
-                                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                                        />
-                                    </svg>
-                                </button>
-                                <button
-                                    @click.stop="deleteFile(file)"
-                                    class="p-1.5 rounded-lg hover:bg-error/20 text-error transition-colors"
-                                    title="Delete"
-                                >
-                                    <svg
-                                        class="w-4 h-4"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="2"
-                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                        />
-                                    </svg>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <div v-if="loading" class="p-8 text-center">
-                <div
-                    class="h-8 w-48 mx-auto rounded bg-[linear-gradient(90deg,var(--color-surface)_0%,var(--color-surface-elevated)_50%,var(--color-surface)_100%)] bg-size-[200%_100%] animate-[shimmer_1.5s_infinite]"
-                ></div>
-            </div>
-
-            <div
-                v-if="!loading && files.length === 0"
-                class="p-8 text-center text-text-muted"
-            >
-                This directory is empty
-            </div>
-        </div>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            </template>
+        </DataTable>
 
         <!-- File Editor Modal -->
         <div
@@ -269,6 +244,7 @@ import { ref, onMounted } from 'vue'
 import { api } from '@/api'
 import { Icon } from '@iconify/vue'
 import BaseButton from '@/components/universal/BaseButton.vue'
+import DataTable from '@/components/universal/DataTable.vue'
 
 interface FileEntry {
     name: string
@@ -280,6 +256,14 @@ interface FileEntry {
     owner: string
     group: string
 }
+
+const tableColumns = [
+    { key: 'name', label: 'Name' },
+    { key: 'size', label: 'Size' },
+    { key: 'modified', label: 'Modified' },
+    { key: 'permissions', label: 'Permissions' },
+    { key: 'actions', label: 'Actions' },
+]
 
 const currentPath = ref('/')
 const files = ref<FileEntry[]>([])

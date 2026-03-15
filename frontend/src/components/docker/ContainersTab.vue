@@ -55,21 +55,18 @@
             </button>
         </div>
 
-        <!-- Table -->
-        <div class="p-0 overflow-hidden">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Image</th>
-                        <th>Status</th>
-                        <th>Ports</th>
-                        <th>Created</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="c in filteredContainers" :key="c.id">
+        <DataTable
+            :columns="tableColumns"
+            :loading="loading"
+            :empty="filteredContainers.length === 0"
+            :emptyText="
+                containers.length === 0
+                    ? 'No containers found'
+                    : 'No containers match your search'
+            "
+        >
+            <template #rows>
+                    <tr v-for="c in filteredContainers" :key="c.id" class="hover:bg-bg-tertiary transition-colors">
                         <td>
                             <div class="flex items-center gap-3">
                                 <div
@@ -284,36 +281,15 @@
                             </div>
                         </td>
                     </tr>
-                </tbody>
-            </table>
-
-            <!-- Loading -->
-            <div
-                v-if="loading && containers.length === 0"
-                class="p-8 text-center"
-            >
-                <div class="shimmer h-8 w-48 mx-auto rounded mb-4"></div>
-                <div class="shimmer h-4 w-32 mx-auto rounded"></div>
-            </div>
-
-            <!-- Empty -->
-            <div
-                v-if="!loading && filteredContainers.length === 0"
-                class="p-8 text-center text-text-muted"
-            >
-                {{
-                    containers.length === 0
-                        ? 'No containers found'
-                        : 'No containers match your search'
-                }}
-            </div>
-        </div>
+            </template>
+        </DataTable>
     </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import BaseInput from '@/components/universal/BaseInput.vue'
+import DataTable from '@/components/universal/DataTable.vue'
 
 export interface ContainerPort {
     ip: string
@@ -352,6 +328,15 @@ defineEmits<{
     (e: 'stats', container: ContainerInfo): void
     (e: 'remove', container: ContainerInfo): void
 }>()
+
+const tableColumns = [
+    { key: 'name', label: 'Name' },
+    { key: 'image', label: 'Image' },
+    { key: 'status', label: 'Status' },
+    { key: 'ports', label: 'Ports' },
+    { key: 'created', label: 'Created' },
+    { key: 'actions', label: 'Actions' },
+]
 
 const searchQuery = ref('')
 const showAll = ref(true)

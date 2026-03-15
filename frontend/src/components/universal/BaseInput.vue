@@ -1,44 +1,35 @@
 <template>
-    <div
-        v-if="variant === 'search'"
-        class="relative w-full h-10 text-xl flex items-center"
-    >
+    <div class="relative w-full flex items-center" :class="variant === 'search' ? 'h-10 text-xl' : ''">
         <input
             ref="inputRef"
             type="text"
-            class="peer absolute rounded-full bg-reisa-lilac-900 w-full h-full px-4 outline-none transition-all"
+            :class="
+                variant === 'search'
+                    ? 'peer absolute rounded-full bg-reisa-lilac-900 w-full h-full px-4 outline-none transition-all'
+                    : 'input w-full'
+            "
             :value="inputValue"
             @input="handleInput"
             v-bind="forwardedAttrs"
         />
 
-        <Icon
-            icon="mdi:magnify"
-            class="absolute text-reisa-lilac-700 z-10 text-3xl ml-4 transition-opacity duration-300 pointer-events-none peer-focus:opacity-0"
-            :class="{ 'opacity-0': hasValue }"
-        />
+        <template v-if="variant === 'search'">
+            <Icon
+                icon="mdi:magnify"
+                class="absolute text-reisa-lilac-700 z-10 text-3xl ml-4 transition-opacity duration-300 pointer-events-none peer-focus:opacity-0"
+                :class="{ 'opacity-0': hasValue }"
+            />
 
-        <div
-            class="absolute flex items-center justify-center right-4 cursor-pointer transition-opacity duration-300 w-10 h-10"
-            :class="{ 'opacity-0': !hasValue }"
-            @click="clearValue"
-        >
-            <span
-                class="absolute w-6 h-0.5 bg-reisa-lilac-700 rotate-45"
-            ></span>
-            <span
-                class="absolute w-6 h-0.5 bg-reisa-lilac-700 -rotate-45"
-            ></span>
-        </div>
+            <div
+                class="absolute flex items-center justify-center right-4 cursor-pointer transition-opacity duration-300 w-10 h-10"
+                :class="{ 'opacity-0': !hasValue }"
+                @click="clearValue"
+            >
+                <span class="absolute w-6 h-0.5 bg-reisa-lilac-700 rotate-45"></span>
+                <span class="absolute w-6 h-0.5 bg-reisa-lilac-700 -rotate-45"></span>
+            </div>
+        </template>
     </div>
-    <input
-        v-else
-        ref="inputRef"
-        class="input"
-        :value="inputValue"
-        @input="handleInput"
-        v-bind="forwardedAttrs"
-    />
 </template>
 
 <script lang="ts" setup>
