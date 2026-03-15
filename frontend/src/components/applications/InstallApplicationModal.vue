@@ -215,7 +215,7 @@
 
                                 <button
                                     type="button"
-                                    class="btn btn-sm btn-ghost border border-border hover:border-reisa-lilac-500/40"
+                                    class="btn btn-sm btn-ghost border border-border"
                                     @click="addCustomPortBinding"
                                 >
                                     + Add Custom Port Mapping
@@ -275,7 +275,7 @@
 
                                 <button
                                     type="button"
-                                    class="btn btn-sm btn-ghost border border-border hover:border-reisa-lilac-500/40"
+                                    class="btn btn-sm btn-ghost border border-border"
                                     @click="addEnvOverride"
                                 >
                                     + Add Environment Override

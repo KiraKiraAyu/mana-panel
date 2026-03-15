@@ -26,7 +26,7 @@
             </button>
             <button
                 @click="$emit('refresh')"
-                class="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-transparent px-5 py-2.5 text-sm font-medium text-text-secondary transition-all duration-200 hover:border-reisa-lilac-500 hover:bg-surface-elevated hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                class="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-transparent px-5 py-2.5 text-sm font-medium text-text-secondary transition-all duration-200 hover:bg-surface-elevated hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
                 :disabled="loading"
             >
                 <svg
@@ -52,7 +52,7 @@
             <div
                 v-for="img in filteredImages"
                 :key="img.id"
-                class="rounded-xl border border-border-subtle bg-surface-elevated p-6 transition-all duration-300 hover:border-reisa-lilac-600 hover:shadow-[0_8px_32px_oklch(0_0_0/0.3),0_0_0_1px_oklch(0.66_0.058_301/0.1)]"
+                class="rounded-xl border border-border-subtle bg-surface-elevated p-6"
             >
                 <div class="flex items-start justify-between mb-3">
                     <div class="flex items-center gap-3 flex-1 min-w-0">
@@ -179,7 +179,7 @@
             v-if="loading && images.length === 0"
             class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
         >
-            <div v-for="i in 6" :key="i" class="card">
+            <div v-for="i in 6" :key="i">
                 <div class="shimmer h-6 w-32 rounded mb-2"></div>
                 <div class="shimmer h-4 w-48 rounded mb-4"></div>
                 <div class="shimmer h-8 w-full rounded"></div>

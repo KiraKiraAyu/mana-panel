@@ -30,11 +30,14 @@
             <p>No templates available</p>
         </div>
 
-        <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        <div
+            v-else
+            class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5"
+        >
             <div
                 v-for="tpl in templates"
                 :key="tpl.id"
-                class="group relative flex flex-col bg-surface border border-border rounded-2xl p-5 hover:shadow-xl hover:shadow-reisa-lilac-500/5 hover:border-reisa-lilac-500/50 transition-all duration-300"
+                class="group relative flex flex-col bg-surface border border-border rounded-2xl p-5"
             >
                 <div class="flex items-start justify-between mb-4">
                     <div class="flex items-center gap-3">
@@ -46,7 +49,9 @@
                             }}</span>
                         </div>
                         <div>
-                            <h3 class="font-semibold text-text-primary leading-tight">
+                            <h3
+                                class="font-semibold text-text-primary leading-tight"
+                            >
                                 {{ tpl.name }}
                             </h3>
                             <div class="flex items-center gap-2 mt-1">
@@ -55,7 +60,9 @@
                                 >
                                     {{ tpl.category || 'App' }}
                                 </span>
-                                <span class="text-xs text-text-muted">v{{ tpl.version }}</span>
+                                <span class="text-xs text-text-muted"
+                                    >v{{ tpl.version }}</span
+                                >
                             </div>
                         </div>
                     </div>
@@ -65,7 +72,9 @@
                     {{ tpl.description || 'No description provided.' }}
                 </p>
 
-                <div class="pt-4 border-t border-border mt-auto flex items-center justify-end">
+                <div
+                    class="pt-4 border-t border-border mt-auto flex items-center justify-end"
+                >
                     <button
                         class="btn btn-sm bg-text-primary text-surface hover:bg-text-primary/90 hover:scale-105 transition-transform border-none rounded-lg font-medium px-4"
                         @click="$emit('install', tpl)"

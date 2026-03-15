@@ -56,7 +56,7 @@
         </div>
 
         <!-- Table -->
-        <div class="card p-0 overflow-hidden">
+        <div class="p-0 overflow-hidden">
             <table class="table">
                 <thead>
                     <tr>

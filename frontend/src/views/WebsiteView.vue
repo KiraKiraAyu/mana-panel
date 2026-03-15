@@ -24,7 +24,7 @@
             v-if="websites.length > 0"
             class="grid grid-cols-1 lg:grid-cols-2 gap-4"
         >
-            <div v-for="site in websites" :key="site.id" class="card">
+            <div v-for="site in websites" :key="site.id">
                 <div class="flex items-start justify-between mb-3">
                     <div class="flex-1 min-w-0">
                         <h3 class="font-semibold text-text-primary truncate">
@@ -145,7 +145,7 @@
         </div>
 
         <!-- Empty State -->
-        <div v-else-if="!loading" class="card text-center py-12">
+        <div v-else-if="!loading" class="text-center py-12">
             <svg
                 class="w-16 h-16 mx-auto text-text-muted mb-4"
                 fill="none"
@@ -176,7 +176,7 @@
             v-if="loading && websites.length === 0"
             class="grid grid-cols-1 lg:grid-cols-2 gap-4"
         >
-            <div v-for="i in 4" :key="i" class="card">
+            <div v-for="i in 4" :key="i">
                 <div class="shimmer h-6 w-40 rounded mb-2"></div>
                 <div class="shimmer h-4 w-56 rounded mb-4"></div>
                 <div class="shimmer h-8 w-full rounded"></div>

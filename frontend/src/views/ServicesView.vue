@@ -4,11 +4,7 @@
 
         <!-- Services Grid -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div
-                v-for="service in filteredServices()"
-                :key="service.name"
-                class="card"
-            >
+            <div v-for="service in filteredServices()" :key="service.name">
                 <div class="flex items-start justify-between mb-3">
                     <div class="flex-1 min-w-0">
                         <h3 class="font-semibold text-text-primary truncate">
@@ -124,7 +120,7 @@
             v-if="loading && services.length === 0"
             class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
         >
-            <div v-for="i in 6" :key="i" class="card">
+            <div v-for="i in 6" :key="i">
                 <div class="shimmer h-6 w-32 rounded mb-2"></div>
                 <div class="shimmer h-4 w-48 rounded mb-4"></div>
                 <div class="shimmer h-8 w-full rounded"></div>

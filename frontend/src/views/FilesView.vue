@@ -43,7 +43,7 @@
 
         <!-- File List -->
         <div
-            class="overflow-hidden rounded-xl border border-border-subtle bg-surface-elevated p-0 transition-all duration-300 hover:border-reisa-lilac-600 hover:shadow-[0_8px_32px_oklch(0_0_0/0.3),0_0_0_1px_oklch(0.66_0.058_301/0.1)]"
+            class="overflow-hidden rounded-xl border border-border-subtle bg-surface-elevated"
         >
             <table
                 class="w-full border-collapse [&_th]:border-b [&_th]:border-border-subtle [&_th]:bg-surface [&_th]:px-4 [&_th]:py-3.5 [&_th]:text-left [&_th]:text-xs [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-text-muted [&_td]:border-b [&_td]:border-border-subtle [&_td]:px-4 [&_td]:py-3.5 [&_td]:text-left [&_tbody_tr]:transition-colors [&_tbody_tr:hover]:bg-surface-elevated"
@@ -248,7 +248,7 @@
                         </button>
                         <button
                             @click="showEditor = false"
-                            class="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-transparent px-5 py-2.5 text-sm font-medium text-text-secondary transition-all duration-200 hover:border-reisa-lilac-500 hover:bg-surface-elevated hover:text-text-primary"
+                            class="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-transparent px-5 py-2.5 text-sm font-medium text-text-secondary transition-all duration-200 hover:bg-surface-elevated hover:text-text-primary"
                         >
                             Close
                         </button>

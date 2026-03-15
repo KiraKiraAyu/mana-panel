@@ -1,14 +1,14 @@
 <template>
     <div class="p-6 space-y-6 animate-in">
         <!-- Account Section -->
-        <div class="card">
+        <div>
             <h2 class="text-lg font-semibold text-text-primary mb-4">
                 Account
             </h2>
 
             <div class="space-y-4">
                 <div
-                    class="rounded-xl border border-border-subtle bg-surface-elevated p-6 transition-all duration-300 hover:border-reisa-lilac-600 hover:shadow-[0_8px_32px_oklch(0_0_0/0.3),0_0_0_1px_oklch(0.66_0.058_301/0.1)]"
+                    class="rounded-xl border border-border-subtle bg-surface-elevated p-6"
                 >
                     <h2 class="text-lg font-semibold text-text-primary mb-4">
                         Account
@@ -62,7 +62,7 @@
         </div>
 
         <!-- Change Password Section -->
-        <div class="card">
+        <div>
             <h2 class="text-lg font-semibold text-text-primary mb-4">
                 Change Password
             </h2>
@@ -111,7 +111,7 @@
                 </div>
 
                 <div
-                    class="rounded-xl border border-border-subtle bg-surface-elevated p-6 transition-all duration-300 hover:border-reisa-lilac-600 hover:shadow-[0_8px_32px_oklch(0_0_0/0.3),0_0_0_1px_oklch(0.66_0.058_301/0.1)]"
+                    class="rounded-xl border border-border-subtle bg-surface-elevated p-6"
                 >
                     <h2 class="text-lg font-semibold text-text-primary mb-4">
                         Change Password
@@ -209,7 +209,7 @@
 
                 <!-- About Section -->
                 <div
-                    class="rounded-xl border border-border-subtle bg-surface-elevated p-6 transition-all duration-300 hover:border-reisa-lilac-600 hover:shadow-[0_8px_32px_oklch(0_0_0/0.3),0_0_0_1px_oklch(0.66_0.058_301/0.1)]"
+                    class="rounded-xl border border-border-subtle bg-surface-elevated p-6"
                 >
                     <h2 class="text-lg font-semibold text-text-primary mb-4">
                         About
@@ -273,7 +273,7 @@
         </div>
 
         <!-- About Section -->
-        <div class="card">
+        <div>
             <h2 class="text-lg font-semibold text-text-primary mb-4">About</h2>
 
             <div class="space-y-3">
@@ -304,7 +304,7 @@
         </div>
 
         <!-- Danger Zone -->
-        <div class="card border border-error/30">
+        <div class="border border-error/30">
             <h2 class="text-lg font-semibold text-error mb-4">Danger Zone</h2>
 
             <div class="flex items-center justify-between">

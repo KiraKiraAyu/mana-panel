@@ -26,7 +26,7 @@
         </div>
 
         <!-- Process Table -->
-        <div class="card p-0 overflow-hidden">
+        <div class="p-0 overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="table">
                     <thead>

@@ -196,7 +196,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <!-- CPU Chart -->
             <div
-                class="rounded-xl border border-border-subtle bg-surface-elevated p-6 transition-all duration-300 hover:border-reisa-lilac-600 hover:shadow-[0_8px_32px_oklch(0_0_0/0.3),0_0_0_1px_oklch(0.66_0.058_301/0.1)]"
+                class="rounded-xl border border-border-subtle bg-surface-elevated p-6"
             >
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="font-semibold text-text-primary">CPU Usage</h3>
@@ -211,7 +211,7 @@
 
             <!-- Memory Chart -->
             <div
-                class="rounded-xl border border-border-subtle bg-surface-elevated p-6 transition-all duration-300 hover:border-reisa-lilac-600 hover:shadow-[0_8px_32px_oklch(0_0_0/0.3),0_0_0_1px_oklch(0.66_0.058_301/0.1)]"
+                class="rounded-xl border border-border-subtle bg-surface-elevated p-6"
             >
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="font-semibold text-text-primary">
@@ -233,7 +233,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <!-- Disk Usage -->
             <div
-                class="rounded-xl border border-border-subtle bg-surface-elevated p-6 transition-all duration-300 hover:border-reisa-lilac-600 hover:shadow-[0_8px_32px_oklch(0_0_0/0.3),0_0_0_1px_oklch(0.66_0.058_301/0.1)]"
+                class="rounded-xl border border-border-subtle bg-surface-elevated p-6"
             >
                 <h3 class="font-semibold text-text-primary mb-4">Disk Usage</h3>
                 <div class="space-y-4">
@@ -276,7 +276,7 @@
 
             <!-- Network -->
             <div
-                class="rounded-xl border border-border-subtle bg-surface-elevated p-6 transition-all duration-300 hover:border-reisa-lilac-600 hover:shadow-[0_8px_32px_oklch(0_0_0/0.3),0_0_0_1px_oklch(0.66_0.058_301/0.1)]"
+                class="rounded-xl border border-border-subtle bg-surface-elevated p-6"
             >
                 <h3 class="font-semibold text-text-primary mb-4">
                     Network Interfaces
