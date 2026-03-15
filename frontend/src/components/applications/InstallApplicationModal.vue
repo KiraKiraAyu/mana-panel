@@ -86,11 +86,10 @@
                                         class="text-sm font-medium text-text-primary"
                                         >Instance Name</label
                                     >
-                                    <input
+                                    <BaseInput
                                         v-model="form.name"
                                         type="text"
                                         :placeholder="form.name"
-                                        class="input w-full bg-background border-border focus:border-reisa-lilac-500 focus:ring-reisa-lilac-500/20 rounded-lg"
                                     />
                                 </div>
                             </div>
@@ -127,7 +126,7 @@
                                         <span class="text-xs text-text-muted"
                                             >Host:</span
                                         >
-                                        <input
+                                        <BaseInput
                                             v-model.number="
                                                 form.port_bindings[port.key]
                                             "
@@ -141,7 +140,7 @@
                                                       )
                                                     : 'Random'
                                             "
-                                            class="input w-full h-8 text-sm bg-background border-border focus:border-reisa-lilac-500 rounded px-2 font-mono"
+                                            class="h-8 px-2 font-mono"
                                         />
                                     </div>
                                 </div>
@@ -178,7 +177,7 @@
                                     :key="`custom-port-${endpoint}`"
                                     class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr_auto] gap-2 items-center"
                                 >
-                                    <input
+                                    <BaseInput
                                         :value="endpoint"
                                         @input="
                                             renameCustomPortEndpoint(
@@ -187,13 +186,13 @@
                                             )
                                         "
                                         placeholder="8081/tcp"
-                                        class="input w-full bg-background border-border focus:border-reisa-lilac-500 rounded-lg font-mono text-sm"
+                                        class="font-mono"
                                     />
                                     <span
                                         class="text-xs text-text-muted text-center"
                                         >→</span
                                     >
-                                    <input
+                                    <BaseInput
                                         v-model.number="
                                             form.extra_port_bindings[endpoint]
                                         "
@@ -201,7 +200,7 @@
                                         min="1"
                                         max="65535"
                                         placeholder="18081"
-                                        class="input w-full bg-background border-border focus:border-reisa-lilac-500 rounded-lg font-mono text-sm"
+                                        class="font-mono"
                                     />
                                     <button
                                         type="button"
@@ -252,18 +251,18 @@
                                     :key="`env-override-${envKey}`"
                                     class="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-2 items-center"
                                 >
-                                    <input
+                                    <BaseInput
                                         :value="envKey"
                                         @input="
                                             renameEnvOverrideKey(envKey, $event)
                                         "
                                         placeholder="ENV_NAME"
-                                        class="input w-full bg-background border-border focus:border-reisa-lilac-500 rounded-lg font-mono text-sm"
+                                        class="font-mono"
                                     />
-                                    <input
+                                    <BaseInput
                                         v-model="form.env_overrides[envKey]"
                                         placeholder="value"
-                                        class="input w-full bg-background border-border focus:border-reisa-lilac-500 rounded-lg font-mono text-sm"
+                                        class="font-mono"
                                     />
                                     <button
                                         type="button"
@@ -405,7 +404,7 @@
                                                 >*</span
                                             >
                                         </label>
-                                        <input
+                                        <BaseInput
                                             v-model="form.values[field.key]"
                                             :type="
                                                 resolveInputType(field.input)
@@ -413,7 +412,6 @@
                                             :placeholder="
                                                 field.placeholder ?? undefined
                                             "
-                                            class="input w-full bg-background border-border focus:border-reisa-lilac-500 rounded-lg"
                                         />
                                         <p
                                             class="text-xs text-text-muted truncate"
@@ -504,6 +502,7 @@ import type {
     ApplicationTemplate,
     ApplicationTemplateParam,
 } from '@/api/applications'
+import BaseInput from '@/components/universal/BaseInput.vue'
 
 export interface InstallFormState {
     template_id: string

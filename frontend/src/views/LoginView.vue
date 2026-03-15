@@ -63,10 +63,9 @@
                         >
                             Username
                         </label>
-                        <input
+                        <BaseInput
                             v-model="username"
                             type="text"
-                            class="w-full rounded-lg border border-border bg-surface px-4 py-3 text-sm text-text-primary transition-all duration-200 placeholder:text-text-muted focus:outline-none focus:border-reisa-lilac-500 focus:shadow-[0_0_0_3px_oklch(0.66_0.058_301/0.2)]"
                             placeholder="Enter your username"
                             required
                             autocomplete="username"
@@ -79,10 +78,9 @@
                         >
                             Password
                         </label>
-                        <input
+                        <BaseInput
                             v-model="password"
                             type="password"
-                            class="w-full rounded-lg border border-border bg-surface px-4 py-3 text-sm text-text-primary transition-all duration-200 placeholder:text-text-muted focus:outline-none focus:border-reisa-lilac-500 focus:shadow-[0_0_0_3px_oklch(0.66_0.058_301/0.2)]"
                             placeholder="Enter your password"
                             required
                             autocomplete="current-password"
@@ -126,6 +124,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import BaseInput from '@/components/universal/BaseInput.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()

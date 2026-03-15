@@ -25,10 +25,9 @@
                     >
                         Image Name
                     </label>
-                    <input
+                    <BaseInput
                         v-model="imageName"
                         type="text"
-                        class="w-full px-4 py-3 text-sm bg-surface border border-border rounded-lg text-text-primary transition-all duration-200 placeholder:text-text-muted focus:outline-none focus:border-reisa-lilac-500 focus:shadow-[0_0_0_3px_oklch(0.66_0.058_301/0.2)] disabled:cursor-not-allowed disabled:opacity-60"
                         placeholder="e.g. nginx:latest, redis:7-alpine, ubuntu:22.04"
                         @keydown.enter="pullImage"
                         :disabled="pulling"
@@ -148,6 +147,7 @@
 <script setup lang="ts">
 import { ref, nextTick } from 'vue'
 import { api } from '@/api'
+import BaseInput from '@/components/universal/BaseInput.vue'
 
 interface PullProgressLine {
     status: string

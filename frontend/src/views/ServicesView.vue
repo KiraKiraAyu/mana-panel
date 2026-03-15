@@ -1,27 +1,6 @@
 <template>
     <div class="p-6 space-y-6 animate-in">
-        <!-- Search -->
-        <div class="relative">
-            <svg
-                class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-muted"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-            >
-                <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-            </svg>
-            <input
-                v-model="searchQuery"
-                type="text"
-                class="input pl-10"
-                placeholder="Search services..."
-            />
-        </div>
+        <BaseInput v-model="searchQuery" variant="search" />
 
         <!-- Services Grid -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -193,6 +172,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { api } from '@/api'
+import BaseInput from '@/components/universal/BaseInput.vue'
 
 interface Service {
     name: string

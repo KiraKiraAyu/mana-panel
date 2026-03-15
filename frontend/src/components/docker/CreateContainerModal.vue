@@ -32,10 +32,9 @@
                             >(optional)</span
                         >
                     </label>
-                    <input
+                    <BaseInput
                         v-model="form.name"
                         type="text"
-                        class="w-full px-4 py-3 text-sm bg-surface border border-border rounded-lg text-text-primary transition-all duration-200 placeholder:text-text-muted focus:outline-none focus:border-reisa-lilac-500 focus:shadow-[0_0_0_3px_oklch(0.66_0.058_301/0.2)]"
                         placeholder="e.g. my-nginx"
                     />
                 </div>
@@ -48,10 +47,9 @@
                         Image
                         <span class="text-error">*</span>
                     </label>
-                    <input
+                    <BaseInput
                         v-model="form.image"
                         type="text"
-                        class="w-full px-4 py-3 text-sm bg-surface border border-border rounded-lg text-text-primary transition-all duration-200 placeholder:text-text-muted focus:outline-none focus:border-reisa-lilac-500 focus:shadow-[0_0_0_3px_oklch(0.66_0.058_301/0.2)]"
                         placeholder="e.g. nginx:latest"
                         required
                     />
@@ -67,10 +65,10 @@
                             >(optional, space-separated)</span
                         >
                     </label>
-                    <input
+                    <BaseInput
                         v-model="cmdRaw"
                         type="text"
-                        class="w-full px-4 py-3 text-sm font-mono bg-surface border border-border rounded-lg text-text-primary transition-all duration-200 placeholder:text-text-muted focus:outline-none focus:border-reisa-lilac-500 focus:shadow-[0_0_0_3px_oklch(0.66_0.058_301/0.2)]"
+                        class="font-mono"
                         placeholder="e.g. /bin/sh -c 'echo hello'"
                     />
                 </div>
@@ -97,17 +95,17 @@
                             :key="idx"
                             class="flex items-center gap-2"
                         >
-                            <input
+                            <BaseInput
                                 v-model="env.key"
                                 type="text"
-                                class="flex-1 px-4 py-3 text-sm font-mono bg-surface border border-border rounded-lg text-text-primary transition-all duration-200 placeholder:text-text-muted focus:outline-none focus:border-reisa-lilac-500 focus:shadow-[0_0_0_3px_oklch(0.66_0.058_301/0.2)]"
+                                class="flex-1 font-mono"
                                 placeholder="KEY"
                             />
                             <span class="text-text-muted">=</span>
-                            <input
+                            <BaseInput
                                 v-model="env.value"
                                 type="text"
-                                class="flex-1 px-4 py-3 text-sm font-mono bg-surface border border-border rounded-lg text-text-primary transition-all duration-200 placeholder:text-text-muted focus:outline-none focus:border-reisa-lilac-500 focus:shadow-[0_0_0_3px_oklch(0.66_0.058_301/0.2)]"
+                                class="flex-1 font-mono"
                                 placeholder="value"
                             />
                             <button
@@ -161,17 +159,17 @@
                             :key="idx"
                             class="flex items-center gap-2"
                         >
-                            <input
+                            <BaseInput
                                 v-model="pm.hostPort"
                                 type="text"
-                                class="w-24 px-3 py-2 text-sm font-mono bg-surface border border-border rounded-lg text-text-primary transition-all duration-200 placeholder:text-text-muted focus:outline-none focus:border-reisa-lilac-500 focus:shadow-[0_0_0_3px_oklch(0.66_0.058_301/0.2)]"
+                                class="w-24 py-2 px-3 font-mono"
                                 placeholder="Host"
                             />
                             <span class="text-text-muted">:</span>
-                            <input
+                            <BaseInput
                                 v-model="pm.containerPort"
                                 type="text"
-                                class="w-24 px-3 py-2 text-sm font-mono bg-surface border border-border rounded-lg text-text-primary transition-all duration-200 placeholder:text-text-muted focus:outline-none focus:border-reisa-lilac-500 focus:shadow-[0_0_0_3px_oklch(0.66_0.058_301/0.2)]"
+                                class="w-24 py-2 px-3 font-mono"
                                 placeholder="Container"
                             />
                             <span class="text-text-muted">/</span>
@@ -233,17 +231,17 @@
                             :key="idx"
                             class="flex items-center gap-2"
                         >
-                            <input
+                            <BaseInput
                                 v-model="vol.hostPath"
                                 type="text"
-                                class="flex-1 px-4 py-3 text-sm font-mono bg-surface border border-border rounded-lg text-text-primary transition-all duration-200 placeholder:text-text-muted focus:outline-none focus:border-reisa-lilac-500 focus:shadow-[0_0_0_3px_oklch(0.66_0.058_301/0.2)]"
+                                class="flex-1 font-mono"
                                 placeholder="Host path"
                             />
                             <span class="text-text-muted">:</span>
-                            <input
+                            <BaseInput
                                 v-model="vol.containerPath"
                                 type="text"
-                                class="flex-1 px-4 py-3 text-sm font-mono bg-surface border border-border rounded-lg text-text-primary transition-all duration-200 placeholder:text-text-muted focus:outline-none focus:border-reisa-lilac-500 focus:shadow-[0_0_0_3px_oklch(0.66_0.058_301/0.2)]"
+                                class="flex-1 font-mono"
                                 placeholder="Container path"
                             />
                             <button
@@ -357,6 +355,7 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
 import { api } from '@/api'
+import BaseInput from '@/components/universal/BaseInput.vue'
 
 const props = defineProps<{
     defaultImage?: string

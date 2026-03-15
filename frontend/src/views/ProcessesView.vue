@@ -4,47 +4,11 @@
         <div
             class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4"
         >
-            <div class="flex-1 relative">
-                <svg
-                    class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-muted"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                    />
-                </svg>
-                <input
-                    v-model="searchQuery"
-                    @input="debouncedSearch"
-                    type="text"
-                    class="input pl-10"
-                    placeholder="Search by process name or PID..."
-                />
-                <button
-                    v-if="searchQuery"
-                    @click="clearSearch"
-                    class="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
-                >
-                    <svg
-                        class="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M6 18L18 6M6 6l12 12"
-                        />
-                    </svg>
-                </button>
-            </div>
+            <BaseInput
+                v-model="searchQuery"
+                @input="debouncedSearch"
+                variant="search"
+            />
 
             <div class="flex items-center gap-2">
                 <select v-model="statusFilter" class="input">
@@ -354,6 +318,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { api } from '@/api'
 import { useConnectionStore } from '@/stores/connection'
+import BaseInput from '@/components/universal/BaseInput.vue'
 
 interface Process {
     pid: number
@@ -520,16 +485,6 @@ const restartProcessStream = () => {
     connectProcessStream()
 }
 
-const reconnectStream = () => {
-    reconnectAttempts.value = 0
-    connectProcessStream()
-}
-
-const refreshNow = async () => {
-    await fetchProcesses()
-    reconnectStream()
-}
-
 const killProcess = async (pid: number) => {
     try {
         await api.post(`/processes/${pid}/kill`)
@@ -632,12 +587,6 @@ const debouncedSearch = () => {
         fetchProcesses()
         restartProcessStream()
     }, 300)
-}
-
-const clearSearch = () => {
-    searchQuery.value = ''
-    fetchProcesses()
-    restartProcessStream()
 }
 
 watch(

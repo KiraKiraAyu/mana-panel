@@ -74,10 +74,9 @@
                     >
                         Current Password
                     </label>
-                    <input
+                    <BaseInput
                         v-model="currentPassword"
                         type="password"
-                        class="input"
                         placeholder="Enter current password"
                         required
                     />
@@ -89,10 +88,9 @@
                     >
                         New Password
                     </label>
-                    <input
+                    <BaseInput
                         v-model="newPassword"
                         type="password"
-                        class="input"
                         placeholder="Enter new password"
                         required
                     />
@@ -104,10 +102,9 @@
                     >
                         Confirm New Password
                     </label>
-                    <input
+                    <BaseInput
                         v-model="confirmPassword"
                         type="password"
-                        class="input"
                         placeholder="Confirm new password"
                         required
                     />
@@ -130,10 +127,9 @@
                             >
                                 Current Password
                             </label>
-                            <input
+                            <BaseInput
                                 v-model="currentPassword"
                                 type="password"
-                                class="w-full px-4 py-3 text-sm bg-surface border border-border rounded-lg text-text-primary transition-all duration-200 placeholder:text-text-muted focus:outline-none focus:border-reisa-lilac-500 focus:shadow-[0_0_0_3px_oklch(0.66_0.058_301/0.2)]"
                                 placeholder="Enter current password"
                                 required
                             />
@@ -145,10 +141,9 @@
                             >
                                 New Password
                             </label>
-                            <input
+                            <BaseInput
                                 v-model="newPassword"
                                 type="password"
-                                class="w-full px-4 py-3 text-sm bg-surface border border-border rounded-lg text-text-primary transition-all duration-200 placeholder:text-text-muted focus:outline-none focus:border-reisa-lilac-500 focus:shadow-[0_0_0_3px_oklch(0.66_0.058_301/0.2)]"
                                 placeholder="Enter new password"
                                 required
                             />
@@ -160,10 +155,9 @@
                             >
                                 Confirm New Password
                             </label>
-                            <input
+                            <BaseInput
                                 v-model="confirmPassword"
                                 type="password"
-                                class="w-full px-4 py-3 text-sm bg-surface border border-border rounded-lg text-text-primary transition-all duration-200 placeholder:text-text-muted focus:outline-none focus:border-reisa-lilac-500 focus:shadow-[0_0_0_3px_oklch(0.66_0.058_301/0.2)]"
                                 placeholder="Confirm new password"
                                 required
                             />
@@ -332,6 +326,7 @@
 import { ref } from 'vue'
 import { api } from '@/api'
 import { useAuthStore } from '@/stores/auth'
+import BaseInput from '@/components/universal/BaseInput.vue'
 
 const authStore = useAuthStore()
 

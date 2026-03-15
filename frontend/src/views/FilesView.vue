@@ -11,44 +11,12 @@
                     class="hidden"
                     @change="handleUpload"
                 />
-                <button
-                    @click="triggerUpload"
-                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-transparent px-5 py-2.5 text-sm font-medium text-text-secondary transition-all duration-200 hover:border-reisa-lilac-500 hover:bg-surface-elevated hover:text-text-primary"
-                >
-                    <svg
-                        class="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-                        />
-                    </svg>
-                    Upload
-                </button>
-                <button
-                    @click="createFolder"
-                    class="inline-flex items-center justify-center gap-2 rounded-lg border-0 bg-linear-to-br from-reisa-lilac-500 to-reisa-lilac-600 px-5 py-2.5 text-sm font-medium text-white transition-all duration-200 hover:-translate-y-px hover:from-reisa-lilac-400 hover:to-reisa-lilac-500 hover:shadow-[0_4px_16px_oklch(0.66_0.058_301/0.4)]"
-                >
-                    <svg
-                        class="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"
-                        />
-                    </svg>
-                    New Folder
-                </button>
+                <BaseButton text="Upload" @click="triggerUpload">
+                    <Icon icon="ic:outline-file-upload" />
+                </BaseButton>
+                <BaseButton text="New Folder" @click="createFolder">
+                    <Icon icon="ic:outline-create-new-folder" />
+                </BaseButton>
             </div>
         </div>
 
@@ -299,6 +267,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { api } from '@/api'
+import { Icon } from '@iconify/vue'
+import BaseButton from '@/components/universal/BaseButton.vue'
 
 interface FileEntry {
     name: string

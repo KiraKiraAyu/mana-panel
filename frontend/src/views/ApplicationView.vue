@@ -163,7 +163,6 @@ const openEnvModal = (id: string, name: string) => {
 
 const {
     loading,
-    dockerAvailable,
     error,
     success,
     templates,
