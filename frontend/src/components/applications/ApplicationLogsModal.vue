@@ -19,7 +19,7 @@
                     ></div>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button
+                    <BaseButton
                         @click="fetchLogs"
                         class="p-2 text-text-secondary hover:text-text-primary transition-colors rounded-lg hover:bg-surface"
                         title="Refresh Logs"
@@ -28,15 +28,15 @@
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
-                    </button>
-                    <button
+                    </BaseButton>
+                    <BaseButton
                         @click="$emit('close')"
                         class="p-2 text-text-muted hover:text-text-primary transition-colors rounded-lg hover:bg-surface"
                     >
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                         </svg>
-                    </button>
+                    </BaseButton>
                 </div>
             </div>
 
@@ -58,13 +58,13 @@
             
             <div class="p-4 border-t border-border bg-surface-secondary/50 flex justify-between items-center text-xs text-text-muted">
                 <span>Showing last 500 lines</span>
-                <button
+                <BaseButton
                     v-if="logs"
                     @click="scrollToBottom"
                     class="hover:text-text-primary transition-colors"
                 >
                     Scroll to Bottom
-                </button>
+                </BaseButton>
             </div>
         </div>
     </div>
@@ -73,6 +73,7 @@
 <script setup lang="ts">
 import { ref, watch, nextTick } from 'vue'
 import { applicationsApi } from '@/api/applications'
+import BaseButton from '@/components/universal/BaseButton.vue'
 
 const props = defineProps<{
     open: boolean

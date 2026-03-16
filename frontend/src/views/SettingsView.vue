@@ -177,9 +177,9 @@
                             {{ passwordSuccess }}
                         </div>
 
-                        <button
+                        <BaseButton
                             type="submit"
-                            class="inline-flex items-center justify-center gap-2 rounded-lg border-0 bg-linear-to-br from-reisa-lilac-500 to-reisa-lilac-600 px-5 py-2.5 text-sm font-medium text-white transition-all duration-200 hover:-translate-y-px hover:from-reisa-lilac-400 hover:to-reisa-lilac-500 hover:shadow-[0_4px_16px_oklch(0.66_0.058_301/0.4)] disabled:cursor-not-allowed disabled:opacity-50"
+                            variant="emphasis"
                             :disabled="passwordLoading"
                         >
                             <svg
@@ -203,7 +203,7 @@
                                 ></path>
                             </svg>
                             Change Password
-                        </button>
+                        </BaseButton>
                     </form>
                 </div>
 
@@ -242,9 +242,9 @@
                     </div>
                 </div>
 
-                <button
+                <BaseButton
                     type="submit"
-                    class="btn btn-primary"
+                    variant="emphasis"
                     :disabled="passwordLoading"
                 >
                     <svg
@@ -268,7 +268,7 @@
                         ></path>
                     </svg>
                     Change Password
-                </button>
+                </BaseButton>
             </form>
         </div>
 
@@ -314,9 +314,9 @@
                         Sign out of your account
                     </p>
                 </div>
-                <button @click="authStore.logout()" class="btn btn-danger">
+                <BaseButton @click="authStore.logout()" variant="emphasis">
                     Logout
-                </button>
+                </BaseButton>
             </div>
         </div>
     </div>
@@ -327,6 +327,7 @@ import { ref } from 'vue'
 import { api } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import BaseInput from '@/components/universal/BaseInput.vue'
+import BaseButton from '@/components/universal/BaseButton.vue'
 
 const authStore = useAuthStore()
 

@@ -75,12 +75,12 @@
                 <div
                     class="pt-4 border-t border-border mt-auto flex items-center justify-end"
                 >
-                    <button
-                        class="btn btn-sm bg-text-primary text-surface hover:bg-text-primary/90 hover:scale-105 transition-transform border-none rounded-lg font-medium px-4"
+                    <BaseButton
+                        variant="emphasis"
                         @click="$emit('install', tpl)"
                     >
                         Install
-                    </button>
+                    </BaseButton>
                 </div>
             </div>
         </div>
@@ -89,6 +89,7 @@
 
 <script setup lang="ts">
 import type { ApplicationTemplate } from '@/api/applications'
+import BaseButton from '@/components/universal/BaseButton.vue'
 
 withDefaults(
     defineProps<{

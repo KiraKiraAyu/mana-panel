@@ -27,9 +27,10 @@
                             >
                         </p>
                     </div>
-                    <button
+                    <BaseButton
                         @click="$emit('close')"
-                        class="btn btn-ghost btn-sm btn-circle text-text-muted hover:text-text-primary"
+                        variant="outline"
+                        class="size-8 rounded-full p-0 text-text-muted hover:text-text-primary"
                         :disabled="submitting"
                     >
                         <svg
@@ -45,7 +46,7 @@
                                 d="M6 18L18 6M6 6l12 12"
                             />
                         </svg>
-                    </button>
+                    </BaseButton>
                 </div>
 
                 <div class="flex-1 overflow-y-auto p-6 scrollbar-thin">
@@ -202,24 +203,25 @@
                                         placeholder="18081"
                                         class="font-mono"
                                     />
-                                    <button
+                                    <BaseButton
                                         type="button"
-                                        class="btn btn-ghost btn-sm text-error hover:bg-error/10"
+                                        variant="outline"
+                                        class="text-error hover:bg-error/10 hover:text-error"
                                         @click="
                                             removeCustomPortEndpoint(endpoint)
                                         "
                                     >
                                         Remove
-                                    </button>
+                                    </BaseButton>
                                 </div>
 
-                                <button
+                                <BaseButton
                                     type="button"
-                                    class="btn btn-sm btn-ghost border border-border"
+                                    variant="outline"
                                     @click="addCustomPortBinding"
                                 >
                                     + Add Custom Port Mapping
-                                </button>
+                                </BaseButton>
                             </div>
                         </div>
 
@@ -264,22 +266,23 @@
                                         placeholder="value"
                                         class="font-mono"
                                     />
-                                    <button
+                                    <BaseButton
                                         type="button"
-                                        class="btn btn-ghost btn-sm text-error hover:bg-error/10"
+                                        variant="outline"
+                                        class="text-error hover:bg-error/10 hover:text-error"
                                         @click="removeEnvOverride(envKey)"
                                     >
                                         Remove
-                                    </button>
+                                    </BaseButton>
                                 </div>
 
-                                <button
+                                <BaseButton
                                     type="button"
-                                    class="btn btn-sm btn-ghost border border-border"
+                                    variant="outline"
                                     @click="addEnvOverride"
                                 >
                                     + Add Environment Override
-                                </button>
+                                </BaseButton>
                             </div>
                         </div>
 
@@ -470,18 +473,19 @@
                         {{ statusMessage || 'Processing...' }}
                     </div>
                     <div class="flex items-center gap-3 ml-auto">
-                        <button
+                        <BaseButton
                             type="button"
-                            class="btn btn-ghost hover:bg-surface-secondary text-text-secondary"
+                            variant="outline"
                             @click="$emit('close')"
                             :disabled="submitting"
                         >
                             Cancel
-                        </button>
-                        <button
+                        </BaseButton>
+                        <BaseButton
                             type="submit"
                             form="installForm"
-                            class="btn bg-reisa-lilac-500 hover:bg-reisa-lilac-600 text-white border-none shadow-lg shadow-reisa-lilac-500/20 min-w-30"
+                            variant="emphasis"
+                            class="min-w-30 shadow-lg shadow-reisa-lilac-500/20"
                             :disabled="!canSubmit || submitting"
                         >
                             <span
@@ -489,7 +493,7 @@
                                 class="loading loading-spinner loading-sm mr-2"
                             ></span>
                             {{ submitting ? 'Deploying...' : 'Deploy' }}
-                        </button>
+                        </BaseButton>
                     </div>
                 </div>
             </div>
@@ -503,6 +507,7 @@ import type {
     ApplicationTemplateParam,
 } from '@/api/applications'
 import BaseInput from '@/components/universal/BaseInput.vue'
+import BaseButton from '@/components/universal/BaseButton.vue'
 
 export interface InstallFormState {
     template_id: string

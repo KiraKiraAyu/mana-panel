@@ -1,7 +1,7 @@
 <template>
     <div class="p-6 space-y-6 animate-in">
         <div class="flex flex-row-reverse items-center justify-between">
-            <button @click="showCreate = true" class="btn btn-primary">
+            <BaseButton @click="showCreate = true" variant="emphasis">
                 <svg
                     class="w-4 h-4"
                     fill="none"
@@ -16,7 +16,7 @@
                     />
                 </svg>
                 New Website
-            </button>
+            </BaseButton>
         </div>
 
         <!-- Website List -->
@@ -103,9 +103,10 @@
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <button
+                    <BaseButton
                         @click="editWebsite(site)"
-                        class="btn btn-ghost flex-1 text-reisa-lilac-400 hover:bg-reisa-lilac-500/20"
+                        variant="outline"
+                        class="flex-1 text-reisa-lilac-400 hover:bg-reisa-lilac-500/20 hover:text-reisa-lilac-400"
                     >
                         <svg
                             class="w-4 h-4"
@@ -121,10 +122,11 @@
                             />
                         </svg>
                         Edit
-                    </button>
-                    <button
+                    </BaseButton>
+                    <BaseButton
                         @click="deleteWebsite(site)"
-                        class="btn btn-ghost text-error hover:bg-error/20"
+                        variant="outline"
+                        class="text-error hover:bg-error/20 hover:text-error"
                     >
                         <svg
                             class="w-4 h-4"
@@ -139,7 +141,7 @@
                                 d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                             />
                         </svg>
-                    </button>
+                    </BaseButton>
                 </div>
             </div>
         </div>
@@ -166,9 +168,9 @@
                 Create your first website to get started with reverse proxy and
                 HTTPS.
             </p>
-            <button @click="showCreate = true" class="btn btn-primary">
+            <BaseButton @click="showCreate = true" variant="emphasis">
                 Create Website
-            </button>
+            </BaseButton>
         </div>
 
         <!-- Loading Skeletons -->
@@ -198,7 +200,7 @@
                     <h3 class="font-semibold text-text-primary text-lg">
                         {{ editingSite ? 'Edit Website' : 'Create Website' }}
                     </h3>
-                    <button
+                    <BaseButton
                         @click="closeModal"
                         class="p-1.5 rounded-lg hover:bg-surface-overlay text-text-muted hover:text-text-primary transition-colors"
                     >
@@ -215,7 +217,7 @@
                                 d="M6 18L18 6M6 6l12 12"
                             />
                         </svg>
-                    </button>
+                    </BaseButton>
                 </div>
 
                 <div class="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
@@ -453,12 +455,17 @@
                 </div>
 
                 <div class="flex gap-3 p-5 border-t border-border-subtle">
-                    <button @click="closeModal" class="btn btn-ghost flex-1">
+                    <BaseButton
+                        @click="closeModal"
+                        variant="outline"
+                        class="flex-1"
+                    >
                         Cancel
-                    </button>
-                    <button
+                    </BaseButton>
+                    <BaseButton
                         @click="submitForm"
-                        class="btn btn-primary flex-1"
+                        variant="emphasis"
+                        class="flex-1"
                         :disabled="submitting"
                     >
                         {{
@@ -468,7 +475,7 @@
                                   ? 'Update'
                                   : 'Create'
                         }}
-                    </button>
+                    </BaseButton>
                 </div>
             </div>
         </div>
@@ -486,6 +493,7 @@ import {
     type SiteType,
     type ProxyTargetType,
 } from '@/api/websites'
+import BaseButton from '@/components/universal/BaseButton.vue'
 import {
     applicationsApi,
     type ApplicationInstance,

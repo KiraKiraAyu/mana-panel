@@ -18,12 +18,12 @@
                 />
             </svg>
             <p>No applications installed</p>
-            <button
+            <BaseButton
                 @click="$emit('switchToAvailable')"
                 class="mt-4 text-reisa-lilac-500 hover:underline text-sm"
             >
                 Go to App Store
-            </button>
+            </BaseButton>
         </div>
 
         <div v-else class="space-y-3">
@@ -137,7 +137,7 @@
                     class="flex items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200"
                 >
                     <template v-if="app.state !== 'running'">
-                        <button
+                        <BaseButton
                             @click="$emit('start', String(app.id))"
                             title="Start"
                             class="p-2 text-text-secondary hover:text-success hover:bg-success/10 rounded-lg transition-colors"
@@ -162,10 +162,10 @@
                                     d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                                 />
                             </svg>
-                        </button>
+                        </BaseButton>
                     </template>
                     <template v-else>
-                        <button
+                        <BaseButton
                             @click="$emit('stop', String(app.id))"
                             title="Stop"
                             class="p-2 text-text-secondary hover:text-warning hover:bg-warning/10 rounded-lg transition-colors"
@@ -184,12 +184,12 @@
                                     d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"
                                 />
                             </svg>
-                        </button>
+                        </BaseButton>
                     </template>
 
                     <div class="w-px h-4 bg-border mx-1"></div>
 
-                    <button
+                    <BaseButton
                         @click="$emit('update', String(app.id))"
                         title="Update"
                         class="p-2 text-text-secondary hover:text-reisa-lilac-500 hover:bg-reisa-lilac-500/10 rounded-lg transition-colors"
@@ -208,9 +208,9 @@
                                 d="M4 4v6h6M20 20v-6h-6M20 8a8 8 0 00-13.657-5.657L4 4m16 16l-2.343 2.343A8 8 0 014 16"
                             />
                         </svg>
-                    </button>
+                    </BaseButton>
 
-                    <button
+                    <BaseButton
                         @click="$emit('logs', String(app.id), app.name)"
                         title="Logs"
                         class="p-2 text-text-secondary hover:text-success hover:bg-success/10 rounded-lg transition-colors"
@@ -229,9 +229,9 @@
                                 d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                             />
                         </svg>
-                    </button>
+                    </BaseButton>
 
-                    <button
+                    <BaseButton
                         @click="$emit('env', String(app.id), app.name)"
                         title="Environment"
                         class="p-2 text-text-secondary hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
@@ -240,9 +240,9 @@
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
                         </svg>
-                    </button>
+                    </BaseButton>
 
-                    <button
+                    <BaseButton
                         @click="$emit('remove', String(app.id), app.name)"
                         title="Remove"
                         class="p-2 text-text-secondary hover:text-error hover:bg-error/10 rounded-lg transition-colors"
@@ -261,7 +261,7 @@
                                 d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                             />
                         </svg>
-                    </button>
+                    </BaseButton>
                 </div>
             </div>
         </div>
@@ -270,6 +270,7 @@
 
 <script setup lang="ts">
 import type { ApplicationInstance } from '@/api/applications'
+import BaseButton from '@/components/universal/BaseButton.vue'
 
 defineProps<{
     instances: ApplicationInstance[]

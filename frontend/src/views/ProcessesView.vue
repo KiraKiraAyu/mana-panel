@@ -8,7 +8,86 @@
             :totalCount="totalCount"
             itemLabel="processes"
             @search="debouncedSearch"
-        />
+        >
+            <template #actions>
+                <!-- Resume: visible when nothing selected or process is stopped -->
+                <BaseButton
+                    v-if="!selectedProcess || selectedProcess.status === 'Stop'"
+                    :disabled="!selectedProcess"
+                    @click="
+                        selectedProcess && resumeProcess(selectedProcess.pid)
+                    "
+                    class="hover:bg-success/20 text-success"
+                    variant="square"
+                    title="Resume Process"
+                >
+                    <svg
+                        class="w-6 h-6"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+                        />
+                    </svg>
+                </BaseButton>
+                <!-- Stop: visible only when a non-stopped process is selected -->
+                <BaseButton
+                    v-if="selectedProcess && selectedProcess.status !== 'Stop'"
+                    @click="stopProcess(selectedProcess.pid)"
+                    class="hover:bg-warning/20 text-warning"
+                    variant="square"
+                    title="Stop Process"
+                >
+                    <svg
+                        class="w-6 h-6"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                    </svg>
+                </BaseButton>
+                <BaseButton
+                    :disabled="!selectedProcess"
+                    @click="
+                        selectedProcess && confirmKillProcess(selectedProcess)
+                    "
+                    class="hover:bg-error/20 text-error"
+                    variant="square"
+                    title="Kill Process"
+                >
+                    <svg
+                        class="w-6 h-6"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M6 18L18 6M6 6l12 12"
+                        />
+                    </svg>
+                </BaseButton>
+            </template>
+        </ListToolbar>
 
         <DataTable
             :columns="tableColumns"
@@ -23,14 +102,21 @@
                 <tr
                     v-for="process in displayedProcesses"
                     :key="process.pid"
-                    class="hover:bg-bg-tertiary transition-colors"
+                    class="cursor-pointer transition-colors"
+                    :class="
+                        selectedPid === process.pid
+                            ? 'bg-reisa-lilac-500/10'
+                            : 'hover:bg-bg-tertiary'
+                    "
+                    @click="
+                        selectedPid =
+                            selectedPid === process.pid ? null : process.pid
+                    "
                 >
                     <td class="font-mono text-sm">{{ process.pid }}</td>
                     <td>
                         <div class="max-w-xs">
-                            <div
-                                class="font-medium text-text-primary truncate"
-                            >
+                            <div class="font-medium text-text-primary truncate">
                                 {{ process.name }}
                             </div>
                             <div
@@ -79,69 +165,6 @@
                     <td class="text-sm text-text-secondary">
                         {{ process.user }}
                     </td>
-                    <td>
-                        <div class="flex items-center justify-end gap-1">
-                            <button
-                                v-if="process.status === 'Stop'"
-                                @click="resumeProcess(process.pid)"
-                                class="p-1.5 rounded-lg hover:bg-success/20 text-success transition-colors"
-                                title="Resume Process"
-                            >
-                                <svg
-                                    class="w-4 h-4"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        stroke-width="2"
-                                        d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-                                    />
-                                </svg>
-                            </button>
-                            <button
-                                v-else
-                                @click="stopProcess(process.pid)"
-                                class="p-1.5 rounded-lg hover:bg-warning/20 text-warning transition-colors"
-                                title="Stop Process"
-                            >
-                                <svg
-                                    class="w-4 h-4"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        stroke-width="2"
-                                        d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                                    />
-                                </svg>
-                            </button>
-                            <button
-                                @click="confirmKillProcess(process)"
-                                class="p-1.5 rounded-lg hover:bg-error/20 text-error transition-colors"
-                                title="Kill Process"
-                            >
-                                <svg
-                                    class="w-4 h-4"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        stroke-width="2"
-                                        d="M6 18L18 6M6 6l12 12"
-                                    />
-                                </svg>
-                            </button>
-                        </div>
-                    </td>
                 </tr>
             </template>
         </DataTable>
@@ -162,6 +185,7 @@ import { api } from '@/api'
 import { useConnectionStore } from '@/stores/connection'
 import ListToolbar from '@/components/universal/ListToolbar.vue'
 import DataTable from '@/components/universal/DataTable.vue'
+import BaseButton from '@/components/universal/BaseButton.vue'
 
 interface Process {
     pid: number
@@ -185,8 +209,12 @@ const tableColumns = [
     { key: 'memory', label: 'Memory', sortable: true },
     { key: 'status', label: 'Status' },
     { key: 'user', label: 'User' },
-    { key: 'actions', label: 'Actions', align: 'right' as const },
 ]
+
+const selectedPid = ref<number | null>(null)
+const selectedProcess = computed(
+    () => processes.value.find((p) => p.pid === selectedPid.value) ?? null,
+)
 
 const statusFilterOptions = [
     { value: 'all', label: 'All Status' },
@@ -195,7 +223,9 @@ const statusFilterOptions = [
     { value: 'Stop', label: 'Stopped' },
     { value: 'Zombie', label: 'Zombie' },
 ]
-const sortBy = ref<'cpu' | 'memory' | 'name' | 'pid'>('cpu')
+const sortableFields = ['cpu', 'memory', 'name', 'pid'] as const
+type SortField = (typeof sortableFields)[number]
+const sortBy = ref<SortField>('cpu')
 const sortOrder = ref<'asc' | 'desc'>('desc')
 const connectionStore = useConnectionStore()
 const sseConnected = ref(false)
@@ -396,7 +426,13 @@ const formatBytes = (bytes: number): string => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
 }
 
-const toggleSort = (field: typeof sortBy.value) => {
+const isSortField = (field: string): field is SortField => {
+    return (sortableFields as readonly string[]).includes(field)
+}
+
+const toggleSort = (field: string) => {
+    if (!isSortField(field)) return
+
     if (sortBy.value === field) {
         sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
     } else {
@@ -448,6 +484,15 @@ const debouncedSearch = () => {
         restartProcessStream()
     }, 300)
 }
+
+watch(displayedProcesses, (list) => {
+    if (
+        selectedPid.value !== null &&
+        !list.some((p) => p.pid === selectedPid.value)
+    ) {
+        selectedPid.value = null
+    }
+})
 
 watch(
     sseConnected,

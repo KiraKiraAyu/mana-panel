@@ -12,13 +12,6 @@
                 <h3 class="font-semibold text-text-primary">
                     Create Container
                 </h3>
-                <button
-                    @click="$emit('close')"
-                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-transparent px-3 py-1.5 text-xs text-text-secondary transition-all duration-200 hover:bg-surface-elevated hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
-                    :disabled="creating"
-                >
-                    Close
-                </button>
             </div>
 
             <form @submit.prevent="submit" class="p-6 space-y-5">
@@ -81,13 +74,13 @@
                         >
                             Environment Variables
                         </label>
-                        <button
+                        <BaseButton
                             type="button"
                             @click="addEnv"
                             class="text-xs text-reisa-lilac-400 hover:text-reisa-lilac-300 transition-colors"
                         >
                             + Add
-                        </button>
+                        </BaseButton>
                     </div>
                     <div class="space-y-2">
                         <div
@@ -108,7 +101,7 @@
                                 class="flex-1 font-mono"
                                 placeholder="value"
                             />
-                            <button
+                            <BaseButton
                                 type="button"
                                 @click="envPairs.splice(idx, 1)"
                                 class="p-1.5 rounded-lg hover:bg-error/20 text-error transition-colors shrink-0"
@@ -126,7 +119,7 @@
                                         d="M6 18L18 6M6 6l12 12"
                                     />
                                 </svg>
-                            </button>
+                            </BaseButton>
                         </div>
                         <p
                             v-if="envPairs.length === 0"
@@ -145,13 +138,13 @@
                         >
                             Port Mappings
                         </label>
-                        <button
+                        <BaseButton
                             type="button"
                             @click="addPort"
                             class="text-xs text-reisa-lilac-400 hover:text-reisa-lilac-300 transition-colors"
                         >
                             + Add
-                        </button>
+                        </BaseButton>
                     </div>
                     <div class="space-y-2">
                         <div
@@ -180,7 +173,7 @@
                                 <option value="tcp">tcp</option>
                                 <option value="udp">udp</option>
                             </select>
-                            <button
+                            <BaseButton
                                 type="button"
                                 @click="portMappings.splice(idx, 1)"
                                 class="p-1.5 rounded-lg hover:bg-error/20 text-error transition-colors shrink-0"
@@ -198,7 +191,7 @@
                                         d="M6 18L18 6M6 6l12 12"
                                     />
                                 </svg>
-                            </button>
+                            </BaseButton>
                         </div>
                         <p
                             v-if="portMappings.length === 0"
@@ -217,13 +210,13 @@
                         >
                             Volume Mounts
                         </label>
-                        <button
+                        <BaseButton
                             type="button"
                             @click="addVolume"
                             class="text-xs text-reisa-lilac-400 hover:text-reisa-lilac-300 transition-colors"
                         >
                             + Add
-                        </button>
+                        </BaseButton>
                     </div>
                     <div class="space-y-2">
                         <div
@@ -244,7 +237,7 @@
                                 class="flex-1 font-mono"
                                 placeholder="Container path"
                             />
-                            <button
+                            <BaseButton
                                 type="button"
                                 @click="volumeMounts.splice(idx, 1)"
                                 class="p-1.5 rounded-lg hover:bg-error/20 text-error transition-colors shrink-0"
@@ -262,7 +255,7 @@
                                         d="M6 18L18 6M6 6l12 12"
                                     />
                                 </svg>
-                            </button>
+                            </BaseButton>
                         </div>
                         <p
                             v-if="volumeMounts.length === 0"
@@ -309,9 +302,10 @@
 
                 <!-- Actions -->
                 <div class="flex items-center gap-3 pt-2">
-                    <button
+                    <BaseButton
                         type="submit"
-                        class="inline-flex items-center justify-center gap-2 flex-1 rounded-lg border-0 bg-linear-to-br from-reisa-lilac-500 to-reisa-lilac-600 px-5 py-2.5 text-sm font-medium text-white transition-all duration-200 hover:-translate-y-px hover:from-reisa-lilac-400 hover:to-reisa-lilac-500 hover:shadow-[0_4px_16px_oklch(0.66_0.058_301/0.4)] disabled:cursor-not-allowed disabled:opacity-50"
+                        variant="emphasis"
+                        class="flex-1"
                         :disabled="creating || !form.image.trim()"
                     >
                         <template v-if="creating">
@@ -337,15 +331,15 @@
                             Creating...
                         </template>
                         <template v-else> Create Container </template>
-                    </button>
-                    <button
+                    </BaseButton>
+                    <BaseButton
                         type="submit"
-                        class="inline-flex items-center justify-center gap-2 rounded-lg border-0 bg-linear-to-br from-reisa-pink-500 to-reisa-pink-600 px-5 py-2.5 text-sm font-medium text-white transition-all duration-200 hover:-translate-y-px hover:from-reisa-pink-400 hover:to-reisa-pink-500 hover:shadow-[0_4px_16px_oklch(0.65_0.21_356/0.4)] disabled:cursor-not-allowed disabled:opacity-50"
+                        variant="emphasis"
                         :disabled="creating || !form.image.trim()"
                         @click.prevent="submitAndStart"
                     >
                         Create &amp; Start
-                    </button>
+                    </BaseButton>
                 </div>
             </form>
         </div>
@@ -356,6 +350,7 @@
 import { ref, reactive } from 'vue'
 import { api } from '@/api'
 import BaseInput from '@/components/universal/BaseInput.vue'
+import BaseButton from '@/components/universal/BaseButton.vue'
 
 const props = defineProps<{
     defaultImage?: string

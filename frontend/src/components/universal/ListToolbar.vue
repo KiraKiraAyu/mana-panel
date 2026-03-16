@@ -7,11 +7,7 @@
         />
 
         <div class="flex items-center gap-2">
-            <select
-                v-if="filterOptions"
-                v-model="filterValue"
-                class="input"
-            >
+            <select v-if="filterOptions" v-model="filterValue" class="input">
                 <option
                     v-for="opt in filterOptions"
                     :key="opt.value"
@@ -27,6 +23,10 @@
             >
                 {{ filteredCount }} of {{ totalCount }} {{ itemLabel }}
             </span>
+        </div>
+
+        <div v-if="$slots.actions" class="flex items-center gap-1 ml-auto">
+            <slot name="actions" />
         </div>
     </div>
 </template>

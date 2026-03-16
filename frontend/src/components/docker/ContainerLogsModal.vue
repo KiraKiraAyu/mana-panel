@@ -29,9 +29,9 @@
                         <option :value="1000">1000 lines</option>
                         <option :value="3000">3000 lines</option>
                     </select>
-                    <button
+                    <BaseButton
                         @click="refresh"
-                        class="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-transparent px-3 py-1.5 text-xs text-text-secondary transition-all duration-200 hover:bg-surface-elevated hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                        variant="outline"
                         :disabled="loading"
                     >
                         <svg
@@ -49,11 +49,8 @@
                             />
                         </svg>
                         Refresh
-                    </button>
-                    <button
-                        @click="scrollToBottom"
-                        class="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-transparent px-3 py-1.5 text-xs text-text-secondary transition-all duration-200 hover:bg-surface-elevated hover:text-text-primary"
-                    >
+                    </BaseButton>
+                    <BaseButton @click="scrollToBottom" variant="outline">
                         <svg
                             class="w-3.5 h-3.5"
                             fill="none"
@@ -68,13 +65,7 @@
                             />
                         </svg>
                         Bottom
-                    </button>
-                    <button
-                        @click="$emit('close')"
-                        class="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-transparent px-3 py-1.5 text-xs text-text-secondary transition-all duration-200 hover:bg-surface-elevated hover:text-text-primary"
-                    >
-                        Close
-                    </button>
+                    </BaseButton>
                 </div>
             </div>
             <div
@@ -124,6 +115,7 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick } from 'vue'
 import { api } from '@/api'
+import BaseButton from '@/components/universal/BaseButton.vue'
 
 const props = defineProps<{
     containerId: string

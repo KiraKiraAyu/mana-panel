@@ -19,13 +19,13 @@
                     <h2 class="text-sm font-semibold text-text-primary">
                         Task Queue
                     </h2>
-                    <button
-                        class="btn btn-xs btn-ghost text-text-secondary"
+                    <BaseButton
+                        variant="outline"
                         :disabled="loading"
                         @click="refreshTasks"
                     >
                         Refresh
-                    </button>
+                    </BaseButton>
                 </div>
 
                 <div
@@ -43,7 +43,7 @@
                 </div>
 
                 <div v-else class="max-h-[70vh] overflow-auto">
-                    <button
+                    <BaseButton
                         v-for="task in tasks"
                         :key="task.id"
                         class="w-full text-left px-4 py-3 border-b border-border last:border-b-0 transition-colors"
@@ -73,7 +73,7 @@
                         <div class="mt-1 text-[11px] text-text-muted">
                             {{ formatTime(task.created_at) }}
                         </div>
-                    </button>
+                    </BaseButton>
                 </div>
             </section>
 
@@ -167,6 +167,7 @@
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useConnectionStore } from '@/stores/connection'
+import BaseButton from '@/components/universal/BaseButton.vue'
 
 import {
     applicationsApi,

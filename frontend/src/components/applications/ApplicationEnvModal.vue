@@ -17,14 +17,14 @@
                         Edit environment variables (key=value). Saving will restart the application.
                     </p>
                 </div>
-                <button
+                <BaseButton
                     @click="$emit('close')"
                     class="p-2 text-text-muted hover:text-text-primary transition-colors rounded-lg hover:bg-surface"
                 >
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
-                </button>
+                </BaseButton>
             </div>
 
             <div class="flex-1 overflow-auto p-4 space-y-4">
@@ -50,21 +50,21 @@
             </div>
             
             <div class="p-4 border-t border-border bg-surface-secondary/50 justify-end flex gap-3">
-                <button
+                <BaseButton
                     @click="$emit('close')"
-                    class="btn btn-ghost"
+                    variant="outline"
                     :disabled="submitting"
                 >
                     Cancel
-                </button>
-                <button
+                </BaseButton>
+                <BaseButton
                     @click="saveEnv"
-                    class="btn btn-primary"
+                    variant="emphasis"
                     :disabled="loading || submitting"
                 >
                     <span v-if="submitting">Saving...</span>
                     <span v-else>Save & Restart</span>
-                </button>
+                </BaseButton>
             </div>
         </div>
     </div>
@@ -73,6 +73,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { applicationsApi } from '@/api/applications'
+import BaseButton from '@/components/universal/BaseButton.vue'
 
 const props = defineProps<{
     open: boolean

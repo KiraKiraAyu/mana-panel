@@ -7,7 +7,119 @@
             :filteredCount="filteredCount"
             :totalCount="totalCount"
             itemLabel="services"
-        />
+        >
+            <template #actions>
+                <!-- Start: visible when nothing selected or service is not active -->
+                <BaseButton
+                    v-if="
+                        !selectedService ||
+                        selectedService.active_state !== 'active'
+                    "
+                    :disabled="!selectedService"
+                    @click="
+                        selectedService && startService(selectedService.name)
+                    "
+                    class="text-success hover:bg-success/20"
+                    title="Start Service"
+                    variant="square"
+                >
+                    <svg
+                        class="w-6 h-6"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+                        />
+                    </svg>
+                </BaseButton>
+                <!-- Stop: visible only when active service is selected -->
+                <BaseButton
+                    v-if="
+                        selectedService &&
+                        selectedService.active_state === 'active'
+                    "
+                    @click="stopService(selectedService.name)"
+                    class="text-warning hover:bg-warning/20"
+                    title="Stop Service"
+                    variant="square"
+                >
+                    <svg
+                        class="w-6 h-6"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"
+                        />
+                    </svg>
+                </BaseButton>
+                <BaseButton
+                    :disabled="!selectedService"
+                    @click="
+                        selectedService && restartService(selectedService.name)
+                    "
+                    class="text-reisa-lilac-400 hover:bg-reisa-lilac-500/20"
+                    variant="square"
+                    title="Restart Service"
+                >
+                    <svg
+                        class="w-6 h-6"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                        />
+                    </svg>
+                </BaseButton>
+                <BaseButton
+                    :disabled="!selectedService"
+                    @click="selectedService && viewLogs(selectedService)"
+                    class="text-reisa-stripe-400 hover:bg-reisa-stripe-500/20"
+                    variant="square"
+                    title="View Logs"
+                >
+                    <svg
+                        class="w-6 h-6"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
+                    </svg>
+                </BaseButton>
+            </template>
+        </ListToolbar>
 
         <DataTable
             :columns="tableColumns"
@@ -19,7 +131,18 @@
                 <tr
                     v-for="service in filteredServices"
                     :key="service.name"
-                    class="hover:bg-bg-tertiary transition-colors"
+                    class="cursor-pointer transition-colors"
+                    :class="
+                        selectedServiceName === service.name
+                            ? 'bg-reisa-lilac-500/10'
+                            : 'hover:bg-bg-tertiary'
+                    "
+                    @click="
+                        selectedServiceName =
+                            selectedServiceName === service.name
+                                ? null
+                                : service.name
+                    "
                 >
                     <td class="font-medium text-text-primary">
                         {{ service.name }}
@@ -43,94 +166,6 @@
                             {{ service.active_state }}
                         </span>
                     </td>
-                    <td>
-                        <div class="flex items-center justify-end gap-1">
-                            <button
-                                v-if="service.active_state !== 'active'"
-                                @click="startService(service.name)"
-                                class="p-1.5 rounded-lg hover:bg-success/20 text-success transition-colors"
-                                title="Start Service"
-                            >
-                                <svg
-                                    class="w-4 h-4"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        stroke-width="2"
-                                        d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-                                    />
-                                </svg>
-                            </button>
-                            <button
-                                v-else
-                                @click="stopService(service.name)"
-                                class="p-1.5 rounded-lg hover:bg-warning/20 text-warning transition-colors"
-                                title="Stop Service"
-                            >
-                                <svg
-                                    class="w-4 h-4"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        stroke-width="2"
-                                        d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                                    />
-                                    <path
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        stroke-width="2"
-                                        d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"
-                                    />
-                                </svg>
-                            </button>
-                            <button
-                                @click="restartService(service.name)"
-                                class="p-1.5 rounded-lg hover:bg-reisa-lilac-500/20 text-reisa-lilac-400 transition-colors"
-                                title="Restart Service"
-                            >
-                                <svg
-                                    class="w-4 h-4"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        stroke-width="2"
-                                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                                    />
-                                </svg>
-                            </button>
-                            <button
-                                @click="viewLogs(service)"
-                                class="p-1.5 rounded-lg hover:bg-reisa-stripe-500/20 text-reisa-stripe-400 transition-colors"
-                                title="View Logs"
-                            >
-                                <svg
-                                    class="w-4 h-4"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        stroke-width="2"
-                                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                                    />
-                                </svg>
-                            </button>
-                        </div>
-                    </td>
                 </tr>
             </template>
         </DataTable>
@@ -148,11 +183,11 @@
                     class="flex items-center justify-between p-4 border-b border-border-subtle"
                 >
                     <h3 class="font-semibold text-text-primary">
-                        Logs: {{ selectedService?.name }}
+                        Logs: {{ logsService?.name }}
                     </h3>
-                    <button @click="showLogs = false" class="btn btn-ghost">
+                    <BaseButton @click="showLogs = false" variant="outline">
                         Close
-                    </button>
+                    </BaseButton>
                 </div>
                 <div
                     class="h-[60vh] overflow-auto p-4 bg-surface font-mono text-xs"
@@ -174,10 +209,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { api } from '@/api'
 import ListToolbar from '@/components/universal/ListToolbar.vue'
 import DataTable from '@/components/universal/DataTable.vue'
+import BaseButton from '@/components/universal/BaseButton.vue'
 
 interface Service {
     name: string
@@ -191,7 +227,8 @@ const services = ref<Service[]>([])
 const loading = ref(false)
 const searchQuery = ref('')
 const statusFilter = ref('all')
-const selectedService = ref<Service | null>(null)
+const selectedServiceName = ref<string | null>(null)
+const logsService = ref<Service | null>(null)
 const logs = ref<string[]>([])
 const showLogs = ref(false)
 
@@ -201,7 +238,6 @@ const tableColumns = [
     { key: 'load_state', label: 'Load State' },
     { key: 'sub_state', label: 'Sub State' },
     { key: 'status', label: 'Status' },
-    { key: 'actions', label: 'Actions', align: 'right' as const },
 ]
 
 const statusFilterOptions = [
@@ -228,6 +264,15 @@ const filteredServices = computed(() => {
     }
 
     return result
+})
+
+const selectedService = computed(() => {
+    if (!selectedServiceName.value) return null
+    return (
+        filteredServices.value.find(
+            (s) => s.name === selectedServiceName.value,
+        ) ?? null
+    )
 })
 
 const totalCount = computed(() => services.value.length)
@@ -274,7 +319,7 @@ const restartService = async (name: string) => {
 }
 
 const viewLogs = async (service: Service) => {
-    selectedService.value = service
+    logsService.value = service
     showLogs.value = true
     try {
         const response = await api.get(`/services/${service.name}/logs`, {
@@ -292,6 +337,15 @@ const getStatusClass = (service: Service) => {
     if (service.active_state === 'failed') return 'badge-error'
     return 'badge-info'
 }
+
+watch(filteredServices, (list) => {
+    if (
+        selectedServiceName.value &&
+        !list.some((s) => s.name === selectedServiceName.value)
+    ) {
+        selectedServiceName.value = null
+    }
+})
 
 onMounted(() => {
     fetchServices()

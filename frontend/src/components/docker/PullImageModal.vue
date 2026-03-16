@@ -10,13 +10,6 @@
                 class="flex items-center justify-between p-4 border-b border-border-subtle"
             >
                 <h3 class="font-semibold text-text-primary">Pull Image</h3>
-                <button
-                    @click="$emit('close')"
-                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-transparent px-3 py-1.5 text-xs text-text-secondary transition-all duration-200 hover:bg-surface-elevated hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
-                    :disabled="pulling"
-                >
-                    Close
-                </button>
             </div>
             <div class="p-6 space-y-4">
                 <div>
@@ -95,9 +88,10 @@
                     </div>
                 </div>
 
-                <button
+                <BaseButton
                     @click="pullImage"
-                    class="inline-flex w-full items-center justify-center gap-2 rounded-lg border-0 bg-linear-to-br from-reisa-lilac-500 to-reisa-lilac-600 px-5 py-2.5 text-sm font-medium text-white transition-all duration-200 hover:-translate-y-px hover:from-reisa-lilac-400 hover:to-reisa-lilac-500 hover:shadow-[0_4px_16px_oklch(0.66_0.058_301/0.4)] disabled:cursor-not-allowed disabled:opacity-50"
+                    variant="emphasis"
+                    class="w-full"
                     :disabled="pulling || !imageName.trim()"
                 >
                     <template v-if="pulling">
@@ -138,7 +132,7 @@
                         </svg>
                         Pull Image
                     </template>
-                </button>
+                </BaseButton>
             </div>
         </div>
     </div>
@@ -148,6 +142,7 @@
 import { ref, nextTick } from 'vue'
 import { api } from '@/api'
 import BaseInput from '@/components/universal/BaseInput.vue'
+import BaseButton from '@/components/universal/BaseButton.vue'
 
 interface PullProgressLine {
     status: string

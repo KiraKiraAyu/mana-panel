@@ -3,21 +3,23 @@
         class="p-6 space-y-6 animate-[fade-in_0.3s_ease-out,slide-up_0.3s_ease-out]"
     >
         <!-- Header -->
-        <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-                <input
-                    ref="uploadInput"
-                    type="file"
-                    class="hidden"
-                    @change="handleUpload"
-                />
-                <BaseButton text="Upload" @click="triggerUpload">
-                    <Icon icon="ic:outline-file-upload" />
-                </BaseButton>
-                <BaseButton text="New Folder" @click="createFolder">
-                    <Icon icon="ic:outline-create-new-folder" />
-                </BaseButton>
-            </div>
+        <div class="flex items-center gap-2">
+            <input
+                ref="uploadInput"
+                type="file"
+                class="hidden"
+                @change="handleUpload"
+            />
+            <BaseButton variant="outline" text="Upload" @click="triggerUpload">
+                <Icon icon="ic:outline-file-upload" />
+            </BaseButton>
+            <BaseButton
+                variant="outline"
+                text="New Folder"
+                @click="createFolder"
+            >
+                <Icon icon="ic:outline-create-new-folder" />
+            </BaseButton>
         </div>
 
         <!-- Breadcrumb -->
@@ -25,7 +27,7 @@
             <template v-for="(part, index) in pathParts()" :key="part.path">
                 <button
                     @click="navigateTo(part.path)"
-                    class="text-text-secondary hover:text-reisa-lilac-400 transition-colors"
+                    class="cursor-pointer text-text-secondary hover:text-reisa-lilac-400 transition-colors"
                     :class="{
                         'text-text-primary font-medium':
                             index === pathParts().length - 1,
@@ -41,11 +43,66 @@
             </template>
         </div>
 
+        <!-- Toolbar -->
+        <ListToolbar
+            v-model:searchQuery="searchQuery"
+            :filteredCount="filteredFiles.length"
+            :totalCount="files.length"
+            itemLabel="files"
+        >
+            <template #actions>
+                <!-- Download: only for files, hidden for dirs -->
+                <BaseButton
+                    v-if="!selectedRow || !selectedRow.is_dir"
+                    :disabled="!selectedRow"
+                    @click="selectedRow && downloadFile(selectedRow)"
+                    class="text-reisa-lilac-400 hover:bg-reisa-lilac-500/20"
+                    variant="square"
+                    title="Download"
+                >
+                    <svg
+                        class="w-6 h-6"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                        />
+                    </svg>
+                </BaseButton>
+                <BaseButton
+                    :disabled="!selectedRow"
+                    @click="selectedRow && deleteFile(selectedRow)"
+                    class="text-error hover:bg-error/20"
+                    variant="square"
+                    title="Delete"
+                >
+                    <svg
+                        class="w-6 h-6"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
+                    </svg>
+                </BaseButton>
+            </template>
+        </ListToolbar>
+
         <!-- File List -->
         <DataTable
             :columns="tableColumns"
             :loading="loading"
-            :empty="files.length === 0"
+            :empty="filteredFiles.length === 0"
             emptyText="This directory is empty"
         >
             <template #rows>
@@ -78,15 +135,23 @@
                     <td>-</td>
                     <td>-</td>
                     <td>-</td>
-                    <td>-</td>
                 </tr>
 
                 <!-- Files -->
                 <tr
-                    v-for="file in files"
+                    v-for="file in filteredFiles"
                     :key="file.path"
+                    @click="
+                        selectedRow =
+                            selectedRow?.path === file.path ? null : file
+                    "
                     @dblclick="openFile(file)"
-                    class="cursor-pointer hover:bg-bg-tertiary transition-colors"
+                    class="cursor-pointer transition-colors"
+                    :class="
+                        selectedRow?.path === file.path
+                            ? 'bg-reisa-lilac-500/10'
+                            : 'hover:bg-bg-tertiary'
+                    "
                 >
                     <td class="flex items-center gap-3">
                         <div
@@ -139,49 +204,6 @@
                     <td class="font-mono text-sm text-text-muted">
                         {{ file.permissions }}
                     </td>
-                    <td>
-                        <div class="flex items-center gap-1">
-                            <button
-                                v-if="!file.is_dir"
-                                @click.stop="downloadFile(file)"
-                                class="p-1.5 rounded-lg hover:bg-reisa-lilac-500/20 text-reisa-lilac-400 transition-colors"
-                                title="Download"
-                            >
-                                <svg
-                                    class="w-4 h-4"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        stroke-width="2"
-                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                                    />
-                                </svg>
-                            </button>
-                            <button
-                                @click.stop="deleteFile(file)"
-                                class="p-1.5 rounded-lg hover:bg-error/20 text-error transition-colors"
-                                title="Delete"
-                            >
-                                <svg
-                                    class="w-4 h-4"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        stroke-width="2"
-                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                    />
-                                </svg>
-                            </button>
-                        </div>
-                    </td>
                 </tr>
             </template>
         </DataTable>
@@ -202,10 +224,7 @@
                         {{ selectedFile?.name }}
                     </h3>
                     <div class="flex items-center gap-2">
-                        <button
-                            @click="saveFile"
-                            class="inline-flex items-center justify-center gap-2 rounded-lg border-0 bg-linear-to-br from-reisa-lilac-500 to-reisa-lilac-600 px-5 py-2.5 text-sm font-medium text-white transition-all duration-200 hover:-translate-y-px hover:from-reisa-lilac-400 hover:to-reisa-lilac-500 hover:shadow-[0_4px_16px_oklch(0.66_0.058_301/0.4)]"
-                        >
+                        <BaseButton @click="saveFile" variant="emphasis">
                             <svg
                                 class="w-4 h-4"
                                 fill="none"
@@ -220,13 +239,13 @@
                                 />
                             </svg>
                             Save
-                        </button>
-                        <button
+                        </BaseButton>
+                        <BaseButton
                             @click="showEditor = false"
-                            class="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-transparent px-5 py-2.5 text-sm font-medium text-text-secondary transition-all duration-200 hover:bg-surface-elevated hover:text-text-primary"
+                            variant="outline"
                         >
                             Close
-                        </button>
+                        </BaseButton>
                     </div>
                 </div>
                 <textarea
@@ -240,10 +259,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { api } from '@/api'
 import { Icon } from '@iconify/vue'
 import BaseButton from '@/components/universal/BaseButton.vue'
+import ListToolbar from '@/components/universal/ListToolbar.vue'
 import DataTable from '@/components/universal/DataTable.vue'
 
 interface FileEntry {
@@ -262,19 +282,37 @@ const tableColumns = [
     { key: 'size', label: 'Size' },
     { key: 'modified', label: 'Modified' },
     { key: 'permissions', label: 'Permissions' },
-    { key: 'actions', label: 'Actions' },
 ]
 
 const currentPath = ref('/')
 const files = ref<FileEntry[]>([])
 const loading = ref(false)
+const searchQuery = ref('')
+const selectedRow = ref<FileEntry | null>(null)
 const selectedFile = ref<FileEntry | null>(null)
 const editingContent = ref('')
 const showEditor = ref(false)
 const uploadInput = ref<HTMLInputElement | null>(null)
 
+const filteredFiles = computed(() => {
+    if (!searchQuery.value) return files.value
+    const q = searchQuery.value.toLowerCase()
+    return files.value.filter((f) => f.name.toLowerCase().includes(q))
+})
+
+watch(filteredFiles, (list) => {
+    if (
+        selectedRow.value &&
+        !list.some((f) => f.path === selectedRow.value!.path)
+    ) {
+        selectedRow.value = null
+    }
+})
+
 const fetchFiles = async (path: string = currentPath.value) => {
     loading.value = true
+    selectedRow.value = null
+    searchQuery.value = ''
     try {
         const response = await api.get('/files', { params: { path } })
         files.value = response.data
@@ -301,7 +339,6 @@ const openFile = async (file: FileEntry) => {
     if (file.is_dir) {
         navigateTo(file.path)
     } else {
-        // Open in editor
         try {
             const response = await api.get('/files/content', {
                 params: { path: file.path },

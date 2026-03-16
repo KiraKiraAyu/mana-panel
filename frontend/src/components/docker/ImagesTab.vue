@@ -5,10 +5,7 @@
             <div class="flex-1">
                 <BaseInput v-model="searchQuery" variant="search" />
             </div>
-            <button
-                @click="$emit('pull')"
-                class="inline-flex items-center justify-center gap-2 rounded-lg border-0 bg-linear-to-br from-reisa-lilac-500 to-reisa-lilac-600 px-5 py-2.5 text-sm font-medium text-white transition-all duration-200 hover:-translate-y-px hover:from-reisa-lilac-400 hover:to-reisa-lilac-500 hover:shadow-[0_4px_16px_oklch(0.66_0.058_301/0.4)] disabled:cursor-not-allowed disabled:opacity-50"
-            >
+            <BaseButton @click="$emit('pull')" variant="emphasis">
                 <svg
                     class="w-4 h-4"
                     fill="none"
@@ -23,10 +20,10 @@
                     />
                 </svg>
                 Pull Image
-            </button>
-            <button
+            </BaseButton>
+            <BaseButton
                 @click="$emit('refresh')"
-                class="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-transparent px-5 py-2.5 text-sm font-medium text-text-secondary transition-all duration-200 hover:bg-surface-elevated hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                variant="outline"
                 :disabled="loading"
             >
                 <svg
@@ -44,7 +41,7 @@
                     />
                 </svg>
                 Refresh
-            </button>
+            </BaseButton>
         </div>
 
         <!-- Images Grid -->
@@ -132,9 +129,10 @@
 
                 <!-- Actions -->
                 <div class="flex items-center gap-2">
-                    <button
+                    <BaseButton
                         @click="$emit('createFromImage', img)"
-                        class="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-border bg-transparent px-3 py-1.5 text-xs font-medium text-success transition-all duration-200 hover:border-success/40 hover:bg-success/20"
+                        variant="outline"
+                        class="flex-1 text-success hover:border-success/40 hover:bg-success/20 hover:text-success"
                     >
                         <svg
                             class="w-4 h-4"
@@ -150,10 +148,11 @@
                             />
                         </svg>
                         Create
-                    </button>
-                    <button
+                    </BaseButton>
+                    <BaseButton
                         @click="$emit('remove', img)"
-                        class="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-transparent px-3 py-1.5 text-xs font-medium text-error transition-all duration-200 hover:border-error/40 hover:bg-error/20"
+                        variant="outline"
+                        class="text-error hover:border-error/40 hover:bg-error/20 hover:text-error"
                     >
                         <svg
                             class="w-4 h-4"
@@ -169,7 +168,7 @@
                             />
                         </svg>
                         Remove
-                    </button>
+                    </BaseButton>
                 </div>
             </div>
         </div>
@@ -203,6 +202,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import BaseInput from '@/components/universal/BaseInput.vue'
+import BaseButton from '@/components/universal/BaseButton.vue'
 
 export interface ImageInfo {
     id: string

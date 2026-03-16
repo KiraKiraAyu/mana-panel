@@ -15,9 +15,9 @@
                 </p>
             </div>
             <div class="flex items-center gap-2">
-                <button
+                <BaseButton
                     @click="fetchStats"
-                    class="btn btn-ghost text-xs"
+                    variant="outline"
                     :disabled="loading"
                 >
                     <svg
@@ -35,10 +35,7 @@
                         />
                     </svg>
                     Refresh
-                </button>
-                <button @click="$emit('close')" class="btn btn-ghost text-xs">
-                    Close
-                </button>
+                </BaseButton>
             </div>
         </div>
 
@@ -135,9 +132,9 @@
                         </p>
                     </div>
                     <div class="flex items-center gap-2">
-                        <button
+                        <BaseButton
                             @click="fetchStats"
-                            class="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-transparent px-3 py-1.5 text-xs text-text-secondary transition-all duration-200 hover:bg-surface-elevated hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                            variant="outline"
                             :disabled="loading"
                         >
                             <svg
@@ -155,13 +152,10 @@
                                 />
                             </svg>
                             Refresh
-                        </button>
-                        <button
-                            @click="$emit('close')"
-                            class="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-transparent px-3 py-1.5 text-xs text-text-secondary transition-all duration-200 hover:bg-surface-elevated hover:text-text-primary"
-                        >
+                        </BaseButton>
+                        <BaseButton @click="$emit('close')" variant="outline">
                             Close
-                        </button>
+                        </BaseButton>
                     </div>
                 </div>
 
@@ -299,12 +293,9 @@
                 <!-- Error State -->
                 <div v-else-if="error" class="p-8 text-center">
                     <p class="text-error text-sm mb-4">{{ error }}</p>
-                    <button
-                        @click="fetchStats"
-                        class="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-transparent px-3 py-1.5 text-xs text-text-secondary transition-all duration-200 hover:bg-surface-elevated hover:text-text-primary"
-                    >
+                    <BaseButton @click="fetchStats" variant="outline">
                         Retry
-                    </button>
+                    </BaseButton>
                 </div>
             </div>
         </div>
@@ -336,9 +327,9 @@
         <!-- Error State -->
         <div v-else-if="error" class="p-8 text-center">
             <p class="text-error text-sm mb-4">{{ error }}</p>
-            <button @click="fetchStats" class="btn btn-ghost text-xs">
+            <BaseButton @click="fetchStats" variant="outline">
                 Retry
-            </button>
+            </BaseButton>
         </div>
     </div>
 </template>
@@ -346,6 +337,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { api } from '@/api'
+import BaseButton from '@/components/universal/BaseButton.vue'
 
 interface ContainerStatsData {
     cpu_percent: number
