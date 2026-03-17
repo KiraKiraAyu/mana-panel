@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use axum::{
     Json, Router,
     extract::{Multipart, Path, State},
@@ -8,7 +10,7 @@ use serde::Deserialize;
 use crate::{
     AppState,
     error::{AppError, AppResult},
-    services::certificate::CertificateService,
+    services::certificate::{CertificateService, run_renewal_cycle},
 };
 
 pub fn router() -> Router<AppState> {
@@ -16,7 +18,9 @@ pub fn router() -> Router<AppState> {
         .route("/", get(list_certificates))
         .route("/issue", post(issue_certificate))
         .route("/upload", post(upload_certificate))
+        .route("/renew-check", post(trigger_renewal_check))
         .route("/{id}", delete(delete_certificate))
+        .route("/{id}/renew", post(renew_certificate_by_id))
 }
 
 #[derive(Debug, Deserialize)]
@@ -101,4 +105,67 @@ async fn delete_certificate(
     Ok(Json(
         serde_json::json!({ "success": true, "message": "Certificate deleted" }),
     ))
+}
+
+async fn renew_certificate_by_id(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+) -> AppResult<Json<crate::db::entities::certificate::Model>> {
+    use crate::db::entities::certificate::Entity as CertEntity;
+    use sea_orm::EntityTrait;
+
+    let cert = CertEntity::find_by_id(id)
+        .one(&*state.db)
+        .await
+        .map_err(|e| AppError::System(format!("Failed to find certificate: {}", e)))?
+        .ok_or_else(|| AppError::NotFound(format!("Certificate {} not found", id)))?;
+
+    let renewed = CertificateService::renew_certificate(&state.db, &cert).await?;
+
+    if let Some(docker) = &state.docker {
+        use crate::services::application::ApplicationManager;
+        use std::path::PathBuf;
+        let app_manager = ApplicationManager::new(PathBuf::from(&state.config.app_root_dir));
+        let _ = CertificateService::reload_proxies_for_domain(
+            &state.db,
+            &renewed.domain,
+            &app_manager,
+            docker,
+        )
+        .await;
+    }
+
+    Ok(Json(renewed))
+}
+
+async fn trigger_renewal_check(
+    State(state): State<AppState>,
+) -> AppResult<Json<serde_json::Value>> {
+    let renewal_guard = match Arc::clone(&state.renewal_lock).try_lock_owned() {
+        Ok(guard) => guard,
+        Err(_) => {
+            return Ok(Json(serde_json::json!({
+                "success": false,
+                "message": "Certificate renewal check is already running"
+            })));
+        }
+    };
+
+    let certs = CertificateService::get_certificates_due_for_renewal(&state.db, 30).await?;
+    let count = certs.len();
+
+    let db = Arc::clone(&state.db);
+    let config = state.config.clone();
+    let docker = state.docker.clone();
+    tokio::spawn(async move {
+        let _renewal_guard = renewal_guard;
+        if let Err(e) = run_renewal_cycle(&db, &config, docker.as_ref()).await {
+            tracing::error!("Manual renewal check failed: {}", e);
+        }
+    });
+
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "message": format!("{} certificate(s) due for renewal, processing in background", count)
+    })))
 }

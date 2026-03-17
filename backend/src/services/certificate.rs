@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use chrono::Utc;
 use instant_acme::{
@@ -13,11 +14,15 @@ use sea_orm::{
 };
 use x509_parser::extensions::GeneralName;
 
+use crate::config::Config;
 use crate::db::entities::{
     certificate::{self, ActiveModel, CertProvider, Entity as CertEntity},
     website::{self, Entity as WebsiteEntity, ServerType},
 };
 use crate::error::{AppError, AppResult};
+use crate::services::application::ApplicationManager;
+use crate::services::docker::DockerService;
+use crate::services::proxy_config::ProxyConfigService;
 
 const CERTS_BASE_DIR: &str = "/opt/mana-panel/certs";
 const ACME_ACCOUNT_PATH: &str = "/opt/mana-panel/certs/acme-account.json";
@@ -724,4 +729,182 @@ impl CertificateService {
             let _ = std::fs::remove_file(path);
         }
     }
+
+    /// Returns all Let's Encrypt certificates expiring within `days_before` days.
+    pub async fn get_certificates_due_for_renewal(
+        db: &DatabaseConnection,
+        days_before: i64,
+    ) -> AppResult<Vec<certificate::Model>> {
+        let threshold = Utc::now() + chrono::Duration::days(days_before);
+        let certs = CertEntity::find()
+            .filter(certificate::Column::Provider.eq(CertProvider::LetsEncrypt))
+            .filter(certificate::Column::ExpiresAt.lte(threshold))
+            .all(db)
+            .await
+            .map_err(|e| AppError::System(format!("Failed to query certificates: {}", e)))?;
+        Ok(certs)
+    }
+
+    /// Collect all aliases currently configured on websites using this domain with SSL.
+    pub async fn collect_domain_aliases(
+        db: &DatabaseConnection,
+        domain: &str,
+    ) -> AppResult<Vec<String>> {
+        let sites = WebsiteEntity::find()
+            .filter(website::Column::HasSsl.eq(true))
+            .filter(website::Column::PrimaryDomain.eq(domain))
+            .all(db)
+            .await
+            .map_err(|e| AppError::System(format!("Failed to query websites: {}", e)))?;
+
+        let mut all_aliases = BTreeSet::new();
+        for site in &sites {
+            if let Ok(aliases) = serde_json::from_value::<Vec<String>>(site.aliases.clone()) {
+                for alias in aliases {
+                    let normalized = alias.trim().trim_end_matches('.').to_ascii_lowercase();
+                    if !normalized.is_empty() && normalized != domain {
+                        all_aliases.insert(normalized);
+                    }
+                }
+            }
+        }
+
+        Ok(all_aliases.into_iter().collect())
+    }
+
+    /// Renew a single ACME certificate. Custom certificates cannot be renewed this way.
+    pub async fn renew_certificate(
+        db: &DatabaseConnection,
+        cert: &certificate::Model,
+    ) -> AppResult<certificate::Model> {
+        match cert.provider {
+            CertProvider::LetsEncrypt => {}
+            CertProvider::Custom => {
+                return Err(AppError::Validation(
+                    "Custom certificates cannot be auto-renewed".to_string(),
+                ));
+            }
+            CertProvider::ZeroSSL => {
+                return Err(AppError::Validation(
+                    "ZeroSSL certificates are not supported by auto-renewal".to_string(),
+                ));
+            }
+        }
+
+        let aliases = Self::collect_domain_aliases(db, &cert.domain).await?;
+
+        tracing::info!(
+            "Renewing certificate for '{}' (expires {}, aliases: {:?})",
+            cert.domain,
+            cert.expires_at,
+            aliases,
+        );
+
+        Self::issue_certificate(db, &cert.domain, &aliases, None).await
+    }
+
+    /// Reload proxy containers for all SSL websites on the given domain.
+    pub async fn reload_proxies_for_domain(
+        db: &DatabaseConnection,
+        domain: &str,
+        app_manager: &ApplicationManager,
+        docker: &DockerService,
+    ) -> AppResult<()> {
+        let sites = WebsiteEntity::find()
+            .filter(website::Column::HasSsl.eq(true))
+            .filter(website::Column::PrimaryDomain.eq(domain))
+            .filter(
+                Condition::any()
+                    .add(website::Column::ServerType.eq(ServerType::Nginx))
+                    .add(website::Column::ServerType.eq(ServerType::OpenResty)),
+            )
+            .all(db)
+            .await
+            .map_err(|e| AppError::System(format!("Failed to query websites: {}", e)))?;
+
+        for site in &sites {
+            if let Err(e) = ProxyConfigService::deploy(site, app_manager, docker).await {
+                tracing::error!(
+                    "Failed to reload proxy for website '{}' after certificate renewal: {}",
+                    site.name,
+                    e
+                );
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// Check for expiring certificates and renew them. Intended to be called from a cron job
+/// via the `renew-certs` CLI subcommand, or triggered manually via the API.
+pub async fn run_renewal_cycle(
+    db: &Arc<DatabaseConnection>,
+    config: &Config,
+    docker: Option<&DockerService>,
+) -> AppResult<()> {
+    let certs = CertificateService::get_certificates_due_for_renewal(db, 30).await?;
+
+    if certs.is_empty() {
+        tracing::info!("Certificate renewal check: no certificates due for renewal");
+        return Ok(());
+    }
+
+    tracing::info!(
+        "Certificate renewal check: {} certificate(s) due for renewal",
+        certs.len()
+    );
+
+    let app_manager = ApplicationManager::new(PathBuf::from(&config.app_root_dir));
+    let mut renewed_count = 0usize;
+    let mut failed_domains = Vec::new();
+
+    for cert in &certs {
+        match CertificateService::renew_certificate(db, cert).await {
+            Ok(renewed) => {
+                renewed_count += 1;
+                tracing::info!(
+                    "Renewed certificate for '{}', new expiry: {}",
+                    renewed.domain,
+                    renewed.expires_at
+                );
+                if let Some(docker) = docker {
+                    if let Err(e) = CertificateService::reload_proxies_for_domain(
+                        db,
+                        &renewed.domain,
+                        &app_manager,
+                        docker,
+                    )
+                    .await
+                    {
+                        tracing::error!(
+                            "Failed to reload proxies after renewing '{}': {}",
+                            renewed.domain,
+                            e
+                        );
+                    }
+                }
+            }
+            Err(e) => {
+                tracing::error!("Failed to renew certificate for '{}': {}", cert.domain, e);
+                failed_domains.push(cert.domain.clone());
+            }
+        }
+    }
+
+    if !failed_domains.is_empty() {
+        return Err(AppError::System(format!(
+            "Certificate renewal finished with {} success(es) and {} failure(s): {}",
+            renewed_count,
+            failed_domains.len(),
+            failed_domains.join(", ")
+        )));
+    }
+
+    tracing::info!(
+        "Certificate renewal check completed successfully: {} certificate(s) renewed",
+        renewed_count
+    );
+
+    Ok(())
 }

@@ -14,6 +14,7 @@ use mana_panel_backend::{
     config::Config,
     db,
     services::{
+        certificate::run_renewal_cycle,
         docker::DockerService,
         monitor::SystemMonitor,
         root_agent::{RootAgentClient, run_root_agent},
@@ -35,6 +36,7 @@ enum Commands {
         username: String,
     },
     RootAgent,
+    RenewCerts,
 }
 
 #[tokio::main]
@@ -69,6 +71,14 @@ async fn main() {
     let db = Arc::new(db_conn);
 
     match &cli.command {
+        Some(Commands::RenewCerts) => {
+            let docker = DockerService::new().ok();
+            if let Err(e) = run_renewal_cycle(&db, &config, docker.as_ref()).await {
+                tracing::error!("Certificate renewal failed: {}", e);
+                std::process::exit(1);
+            }
+            return;
+        }
         Some(Commands::CreateUser { username }) => {
             // Generate random password
             use rand::Rng;
@@ -158,6 +168,7 @@ async fn main() {
         db,
         docker,
         root_agent,
+        renewal_lock: Arc::new(tokio::sync::Mutex::new(())),
     };
 
     let cors = CorsLayer::new()

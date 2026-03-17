@@ -7,6 +7,7 @@ pub mod services;
 
 use sea_orm::DatabaseConnection;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 
 pub use config::Config;
 pub use services::docker::DockerService;
@@ -20,4 +21,5 @@ pub struct AppState {
     pub db: Arc<DatabaseConnection>,
     pub docker: Option<DockerService>,
     pub root_agent: RootAgentClient,
+    pub renewal_lock: Arc<Mutex<()>>,
 }
