@@ -5,7 +5,7 @@
         :class="classes"
     >
         <template v-if="text">
-            <div class="text-lg">
+            <div class="text-lg" v-if="$slots.default">
                 <slot></slot>
             </div>
             <div class="relative overflow-hidden inline-flex">

@@ -1,5 +1,6 @@
 pub mod application;
 pub mod application_task;
+pub mod certificate;
 pub mod compose;
 pub mod docker;
 pub mod fs_utils;

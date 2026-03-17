@@ -55,6 +55,12 @@ time = "0.3"
 dotenvy = "0.15"
 tera = "1.20.1"
 
+# SSL / ACME
+instant-acme = "0.7"
+rcgen = "0.13"
+pem = "3"
+x509-parser = "0.16"
+
 # Terminal PTY (for Linux)
 [target.'cfg(unix)'.dependencies]
 portable-pty = "0.9"

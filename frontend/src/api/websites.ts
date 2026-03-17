@@ -36,6 +36,7 @@ export interface CreateWebsiteRequest {
     proxy_target_app_id?: string | null
     proxy_target_app_port?: number | null
     root_dir?: string | null
+    has_ssl?: boolean
 }
 
 export interface UpdateWebsiteRequest {
@@ -49,6 +50,43 @@ export interface UpdateWebsiteRequest {
     proxy_target_app_id?: string | null
     proxy_target_app_port?: number | null
     root_dir?: string | null
+    has_ssl?: boolean
+}
+
+export interface CertificateInfo {
+    id: number
+    domain: string
+    provider: 'letsencrypt' | 'zerossl' | 'custom'
+    cert_path: string
+    key_path: string
+    expires_at: string
+    created_at: string
+    updated_at: string
+}
+
+export const certificatesApi = {
+    async list(): Promise<CertificateInfo[]> {
+        const response = await api.get('/certificates')
+        return response.data
+    },
+
+    async issue(domain: string, aliases?: string[], email?: string): Promise<CertificateInfo> {
+        const response = await api.post('/certificates/issue', { domain, aliases, email })
+        return response.data
+    },
+
+    async upload(domain: string, cert: string, key: string): Promise<CertificateInfo> {
+        const formData = new FormData()
+        formData.append('domain', domain)
+        formData.append('cert', cert)
+        formData.append('key', key)
+        const response = await api.post('/certificates/upload', formData)
+        return response.data
+    },
+
+    async remove(id: number): Promise<void> {
+        await api.delete(`/certificates/${id}`)
+    },
 }
 
 export const websitesApi = {

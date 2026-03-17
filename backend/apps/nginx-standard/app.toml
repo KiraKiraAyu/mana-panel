@@ -35,6 +35,14 @@ default_host_port = 80
 required = true
 env_key = "PANEL_APP_PORT_HTTP"
 
+[[port]]
+key = "https"
+container_port = 443
+protocol = "tcp"
+default_host_port = 443
+required = false
+env_key = "PANEL_APP_PORT_HTTPS"
+
 [[config_file]]
 path = "conf/nginx.conf"
 

@@ -1,7 +1,40 @@
 # Managed by mana-panel – Website ID: {{ website_id }}
+{% if has_ssl %}
+# HTTP → HTTPS redirect + ACME challenge
 server {
     listen 80;
     listen [::]:80;
+
+    server_name {{ primary_domain }}{% for alias in aliases %} {{ alias }}{% endfor %};
+
+    location /.well-known/acme-challenge/ {
+        root /opt/mana-panel/acme-challenge;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+{% endif %}
+
+server {
+{% if has_ssl %}
+    listen 443 ssl;
+    listen [::]:443 ssl;
+
+    ssl_certificate {{ ssl_cert_path }};
+    ssl_certificate_key {{ ssl_key_path }};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+{% else %}
+    listen 80;
+    listen [::]:80;
+
+    # ACME challenge support (for future SSL provisioning)
+    location /.well-known/acme-challenge/ {
+        root /opt/mana-panel/acme-challenge;
+    }
+{% endif %}
 
     server_name {{ primary_domain }}{% for alias in aliases %} {{ alias }}{% endfor %};
 

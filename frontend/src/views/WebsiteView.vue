@@ -37,6 +37,26 @@
                     <div class="flex flex-col items-end gap-2">
                         <div class="flex items-center gap-2">
                             <span
+                                v-if="site.has_ssl"
+                                class="badge badge-success flex items-center gap-1"
+                                title="HTTPS enabled"
+                            >
+                                <svg
+                                    class="w-3 h-3"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                                    />
+                                </svg>
+                                HTTPS
+                            </span>
+                            <span
                                 :class="['badge', statusClass(site.status)]"
                                 :title="site.error || undefined"
                                 >{{ site.status }}</span
@@ -331,27 +351,33 @@
                         </div>
                     </div>
 
-                    <div
-                        class="p-3 bg-surface border border-reisa-lilac-500/20 text-reisa-lilac-500 rounded-lg text-sm flex gap-2"
-                    >
-                        <svg
-                            class="w-5 h-5 shrink-0"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    <!-- SSL / HTTPS -->
+                    <div>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                v-model="form.has_ssl"
+                                class="checkbox checkbox-primary"
+                                :disabled="isCaddySelected"
                             />
-                        </svg>
-                        <p>
-                            <strong>Automatic SSL:</strong> Caddy automatically
-                            provisions HTTPS (Let's Encrypt) for your domains as
-                            long as you point your DNS records to this server's
-                            IP.
+                            <span class="text-sm font-medium text-text-primary"
+                                >Enable HTTPS</span
+                            >
+                        </label>
+                        <p
+                            v-if="isCaddySelected"
+                            class="text-xs text-reisa-lilac-400 mt-1.5 ml-6"
+                        >
+                            Caddy automatically provisions HTTPS via Let's
+                            Encrypt. SSL is always enabled.
+                        </p>
+                        <p
+                            v-else-if="form.has_ssl"
+                            class="text-xs text-reisa-lilac-400 mt-1.5 ml-6"
+                        >
+                            A Let's Encrypt certificate will be automatically
+                            issued. Ensure your domain's DNS points to this
+                            server.
                         </p>
                     </div>
 
@@ -454,28 +480,21 @@
                     </div>
                 </div>
 
-                <div class="flex gap-3 p-5 border-t border-border-subtle">
-                    <BaseButton
-                        @click="closeModal"
-                        variant="outline"
-                        class="flex-1"
-                    >
-                        Cancel
-                    </BaseButton>
+                <div
+                    class="flex flex-row-reverse gap-3 p-5 border-t border-border-subtle"
+                >
                     <BaseButton
                         @click="submitForm"
                         variant="emphasis"
-                        class="flex-1"
                         :disabled="submitting"
-                    >
-                        {{
+                        :text="
                             submitting
                                 ? 'Saving...'
                                 : editingSite
                                   ? 'Update'
                                   : 'Create'
-                        }}
-                    </BaseButton>
+                        "
+                    ></BaseButton>
                 </div>
             </div>
         </div>
@@ -518,6 +537,7 @@ const form = ref<{
     proxy_target_app_id: string
     proxy_target_app_port: number
     root_dir: string
+    has_ssl: boolean
 }>({
     name: '',
     primary_domain: '',
@@ -528,7 +548,18 @@ const form = ref<{
     proxy_target_app_id: '',
     proxy_target_app_port: 0,
     root_dir: '',
+    has_ssl: true,
 })
+
+const selectedServerType = computed<ServerType | null>(() => {
+    if (!form.value.server_instance_id) return null
+    const instance = proxyServerInstances.value.find(
+        (i) => i.id === form.value.server_instance_id,
+    )
+    return instance ? serverTypeFromTemplate(instance.template_id) : null
+})
+
+const isCaddySelected = computed(() => selectedServerType.value === 'caddy')
 
 const PROXY_TEMPLATE_TO_SERVER_TYPE: Record<string, ServerType> = {
     'caddy-autossl': 'caddy',
@@ -558,6 +589,13 @@ const selectedAppPorts = computed<ApplicationPort[]>(() => {
         (a) => a.id === form.value.proxy_target_app_id,
     )
     return app?.ports ?? []
+})
+
+// Force SSL on for Caddy
+watch(isCaddySelected, (isCaddy) => {
+    if (isCaddy) {
+        form.value.has_ssl = true
+    }
 })
 
 // Auto-populate root_dir for static sites
@@ -613,6 +651,7 @@ const resetForm = () => {
         proxy_target_app_id: '',
         proxy_target_app_port: 0,
         root_dir: '',
+        has_ssl: true,
     }
     aliasesInput.value = ''
 }
@@ -629,6 +668,7 @@ const editWebsite = (site: WebsiteInfo) => {
         proxy_target_app_id: site.proxy_target_app_id || '',
         proxy_target_app_port: site.proxy_target_app_port || 0,
         root_dir: site.root_dir || '',
+        has_ssl: site.has_ssl,
     }
     aliasesInput.value = site.aliases.join(', ')
     fetchAppInstances()
@@ -659,6 +699,7 @@ const submitForm = async () => {
                 primary_domain: form.value.primary_domain,
                 aliases,
                 server_instance_id: form.value.server_instance_id,
+                has_ssl: form.value.has_ssl,
             }
 
             if (form.value.site_types.includes('reverse_proxy')) {
@@ -685,6 +726,7 @@ const submitForm = async () => {
                 aliases,
                 server_instance_id: form.value.server_instance_id,
                 site_types: form.value.site_types,
+                has_ssl: form.value.has_ssl,
             }
 
             if (form.value.site_types.includes('reverse_proxy')) {

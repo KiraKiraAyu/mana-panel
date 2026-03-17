@@ -1,5 +1,8 @@
 use chrono::Utc;
-use sea_orm::{ActiveModelTrait, ConnectionTrait, DatabaseConnection, EntityTrait, ModelTrait, QueryOrder, Set, TransactionTrait};
+use sea_orm::{
+    ActiveModelTrait, ConnectionTrait, DatabaseConnection, EntityTrait, ModelTrait, QueryOrder,
+    Set, TransactionTrait,
+};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -73,6 +76,8 @@ pub struct CreateWebsiteRequest {
     pub proxy_target_app_id: Option<String>,
     pub proxy_target_app_port: Option<i32>,
     pub root_dir: Option<String>,
+    #[serde(default)]
+    pub has_ssl: bool,
 }
 
 // Use custom double Option deserialization
@@ -246,6 +251,22 @@ impl WebsiteService {
 
         let now = Utc::now();
 
+        let wants_ssl_on_nginx = matches!(
+            resolved_server_type,
+            ServerType::Nginx | ServerType::OpenResty
+        ) && req.has_ssl;
+
+        // Save domain/aliases before moving into ActiveModel
+        let primary_domain_ref = req.primary_domain.clone();
+        let aliases_ref = req.aliases.clone();
+
+        let is_caddy = resolved_server_type == ServerType::Caddy;
+        let initial_ssl = if wants_ssl_on_nginx {
+            false // Deploy HTTP first so ACME challenge can be served
+        } else {
+            is_caddy || req.has_ssl
+        };
+
         let model = ActiveModel {
             name: Set(req.name),
             primary_domain: Set(req.primary_domain),
@@ -258,34 +279,49 @@ impl WebsiteService {
             } else {
                 None
             }),
-            proxy_target_url: Set(if req.site_types.contains(&SiteType::ReverseProxy) && matches!(&req.proxy_target_type, Some(ProxyTargetType::Url)) {
-                req.proxy_target_url.clone()
-            } else {
-                None
-            }),
-            proxy_target_app_id: Set(if req.site_types.contains(&SiteType::ReverseProxy) && matches!(&req.proxy_target_type, Some(ProxyTargetType::Application)) {
-                req.proxy_target_app_id.clone()
-            } else {
-                None
-            }),
-            proxy_target_app_port: Set(if req.site_types.contains(&SiteType::ReverseProxy) && matches!(&req.proxy_target_type, Some(ProxyTargetType::Application)) {
-                req.proxy_target_app_port
-            } else {
-                None
-            }),
+            proxy_target_url: Set(
+                if req.site_types.contains(&SiteType::ReverseProxy)
+                    && matches!(&req.proxy_target_type, Some(ProxyTargetType::Url))
+                {
+                    req.proxy_target_url.clone()
+                } else {
+                    None
+                },
+            ),
+            proxy_target_app_id: Set(
+                if req.site_types.contains(&SiteType::ReverseProxy)
+                    && matches!(&req.proxy_target_type, Some(ProxyTargetType::Application))
+                {
+                    req.proxy_target_app_id.clone()
+                } else {
+                    None
+                },
+            ),
+            proxy_target_app_port: Set(
+                if req.site_types.contains(&SiteType::ReverseProxy)
+                    && matches!(&req.proxy_target_type, Some(ProxyTargetType::Application))
+                {
+                    req.proxy_target_app_port
+                } else {
+                    None
+                },
+            ),
             root_dir: Set(if req.site_types.contains(&SiteType::Static) {
                 req.root_dir.clone()
             } else {
                 None
             }),
             status: Set(WebsiteStatus::Running),
-            has_ssl: Set(false),
+            has_ssl: Set(initial_ssl),
             created_at: Set(now),
             updated_at: Set(now),
             ..Default::default()
         };
 
-        let txn = db.begin().await.map_err(|e| AppError::System(format!("Failed to begin transaction: {}", e)))?;
+        let txn = db
+            .begin()
+            .await
+            .map_err(|e| AppError::System(format!("Failed to begin transaction: {}", e)))?;
 
         let result = model
             .insert(&txn)
@@ -294,12 +330,104 @@ impl WebsiteService {
 
         if let Err(e) = ProxyConfigService::deploy(&result, app_manager, docker).await {
             txn.rollback().await.ok();
-            return Err(AppError::System(format!("Failed to deploy proxy configuration: {}", e)));
+            return Err(AppError::System(format!(
+                "Failed to deploy proxy configuration: {}",
+                e
+            )));
         }
 
-        txn.commit().await.map_err(|e| AppError::System(format!("Failed to commit transaction: {}", e)))?;
+        txn.commit()
+            .await
+            .map_err(|e| AppError::System(format!("Failed to commit transaction: {}", e)))?;
+
+        // If SSL was requested for Nginx/OpenResty, issue certificate then redeploy with SSL
+        if wants_ssl_on_nginx {
+            match Self::issue_and_enable_ssl(
+                db,
+                app_manager,
+                docker,
+                result.id,
+                &primary_domain_ref,
+                &aliases_ref,
+            )
+            .await
+            {
+                Ok(updated) => return Ok(WebsiteInfo::from(updated)),
+                Err(e) => {
+                    tracing::warn!(
+                        "SSL certificate issuance failed for website '{}': {}. Site deployed with HTTP only.",
+                        result.name,
+                        e
+                    );
+                    // Update the error field to inform the user
+                    let mut am: ActiveModel = result.clone().into();
+                    am.error = Set(Some(format!(
+                        "SSL provisioning failed: {}. Site is accessible via HTTP.",
+                        e
+                    )));
+                    am.updated_at = Set(Utc::now());
+                    let _ = am.update(db).await;
+                }
+            }
+        }
 
         Ok(WebsiteInfo::from(result))
+    }
+
+    /// Issue a Let's Encrypt certificate and redeploy the site with SSL enabled.
+    async fn issue_and_enable_ssl(
+        db: &DatabaseConnection,
+        app_manager: &ApplicationManager,
+        docker: &DockerService,
+        website_id: i32,
+        domain: &str,
+        aliases: &[String],
+    ) -> AppResult<website::Model> {
+        use crate::services::certificate::CertificateService;
+
+        // Issue/re-issue when missing or when existing cert does not cover all requested names.
+        let should_issue = match CertificateService::get_by_domain(db, domain).await? {
+            Some(cert) => {
+                !CertificateService::stored_certificate_covers_domains(&cert, domain, aliases)?
+            }
+            None => true,
+        };
+
+        if should_issue {
+            CertificateService::issue_certificate(db, domain, aliases, None).await?;
+        }
+
+        // Enable SSL on the website and redeploy
+        let txn = db
+            .begin()
+            .await
+            .map_err(|e| AppError::System(format!("Failed to begin transaction: {}", e)))?;
+
+        let model = Self::get_model_by_id(&txn, website_id).await?;
+        let mut am: ActiveModel = model.into();
+        am.has_ssl = Set(true);
+        am.error = Set(None);
+        am.updated_at = Set(Utc::now());
+
+        let result = am
+            .update(&txn)
+            .await
+            .map_err(|e| AppError::System(format!("Failed to enable SSL on website: {}", e)))?;
+
+        if let Err(e) = ProxyConfigService::deploy(&result, app_manager, docker).await {
+            txn.rollback().await.ok();
+            return Err(AppError::System(format!(
+                "Failed to redeploy with SSL: {}",
+                e
+            )));
+        }
+
+        txn.commit()
+            .await
+            .map_err(|e| AppError::System(format!("Failed to commit SSL update: {}", e)))?;
+
+        tracing::info!("SSL enabled for website '{}' ({})", result.name, domain);
+        Ok(result)
     }
 
     pub async fn update(
@@ -309,7 +437,10 @@ impl WebsiteService {
         id: i32,
         req: UpdateWebsiteRequest,
     ) -> AppResult<WebsiteInfo> {
-        let txn = db.begin().await.map_err(|e| AppError::System(format!("Failed to begin transaction: {}", e)))?;
+        let txn = db
+            .begin()
+            .await
+            .map_err(|e| AppError::System(format!("Failed to begin transaction: {}", e)))?;
 
         let existing = WebsiteEntity::find_by_id(id)
             .one(&txn)
@@ -383,7 +514,11 @@ impl WebsiteService {
             }
             am.server_instance_id = Set(Some(server_instance_id.clone()));
             let resolved_server_type = Self::resolve_server_type(app_manager, &server_instance_id)?;
-            am.server_type = Set(resolved_server_type);
+            am.server_type = Set(resolved_server_type.clone());
+            // Caddy auto-provisions HTTPS; set has_ssl accordingly when server changes
+            if resolved_server_type == ServerType::Caddy {
+                am.has_ssl = Set(true);
+            }
         }
 
         if let Some(proxy_target_type) = req.proxy_target_type {
@@ -423,7 +558,8 @@ impl WebsiteService {
             am.root_dir = Set(root_dir);
         }
 
-        let existing_site_types: Vec<SiteType> = serde_json::from_value(existing.site_types.clone()).unwrap_or_default();
+        let existing_site_types: Vec<SiteType> =
+            serde_json::from_value(existing.site_types.clone()).unwrap_or_default();
         let mut final_site_types = existing_site_types.clone();
 
         if let Some(site_types) = req.site_types {
@@ -476,8 +612,48 @@ impl WebsiteService {
             final_root_dir.as_deref(),
         )?;
 
+        // Determine the final server type
+        let final_server_type = match &am.server_type {
+            sea_orm::ActiveValue::Set(v) => v.clone(),
+            _ => existing.server_type.clone(),
+        };
+
         if let Some(has_ssl) = req.has_ssl {
             am.has_ssl = Set(has_ssl);
+        }
+
+        let final_primary_domain = match &am.primary_domain {
+            sea_orm::ActiveValue::Set(v) => v.clone(),
+            _ => existing.primary_domain.clone(),
+        };
+        let final_aliases: Vec<String> = match &am.aliases {
+            sea_orm::ActiveValue::Set(v) => serde_json::from_value(v.clone()).unwrap_or_default(),
+            _ => serde_json::from_value(existing.aliases.clone()).unwrap_or_default(),
+        };
+        let final_has_ssl = match &am.has_ssl {
+            sea_orm::ActiveValue::Set(v) => *v,
+            _ => existing.has_ssl,
+        };
+
+        let mut needs_ssl_provisioning = false;
+        if final_has_ssl && matches!(final_server_type, ServerType::Nginx | ServerType::OpenResty) {
+            use crate::services::certificate::CertificateService;
+
+            let has_usable_cert =
+                match CertificateService::get_by_domain(db, &final_primary_domain).await? {
+                    Some(cert) => CertificateService::stored_certificate_covers_domains(
+                        &cert,
+                        &final_primary_domain,
+                        &final_aliases,
+                    )?,
+                    None => false,
+                };
+
+            if !has_usable_cert {
+                // Deploy HTTP first so ACME HTTP-01 challenge can be served.
+                needs_ssl_provisioning = true;
+                am.has_ssl = Set(false);
+            }
         }
 
         am.status = Set(WebsiteStatus::Running);
@@ -491,10 +667,45 @@ impl WebsiteService {
 
         if let Err(e) = ProxyConfigService::deploy(&result, app_manager, docker).await {
             txn.rollback().await.ok();
-            return Err(AppError::System(format!("Failed to re-deploy proxy configuration: {}", e)));
+            return Err(AppError::System(format!(
+                "Failed to re-deploy proxy configuration: {}",
+                e
+            )));
         }
 
-        txn.commit().await.map_err(|e| AppError::System(format!("Failed to commit transaction: {}", e)))?;
+        txn.commit()
+            .await
+            .map_err(|e| AppError::System(format!("Failed to commit transaction: {}", e)))?;
+
+        // If SSL is requested on Nginx/OpenResty and no cert exists yet, issue then redeploy.
+        if needs_ssl_provisioning {
+            match Self::issue_and_enable_ssl(
+                db,
+                app_manager,
+                docker,
+                id,
+                &final_primary_domain,
+                &final_aliases,
+            )
+            .await
+            {
+                Ok(updated) => return Ok(WebsiteInfo::from(updated)),
+                Err(e) => {
+                    tracing::warn!(
+                        "SSL certificate issuance failed for website '{}': {}. Site remains HTTP.",
+                        result.name,
+                        e
+                    );
+                    let mut am: ActiveModel = result.clone().into();
+                    am.error = Set(Some(format!(
+                        "SSL provisioning failed: {}. Site is accessible via HTTP.",
+                        e
+                    )));
+                    am.updated_at = Set(Utc::now());
+                    let _ = am.update(db).await;
+                }
+            }
+        }
 
         Ok(WebsiteInfo::from(result))
     }
@@ -505,7 +716,10 @@ impl WebsiteService {
         docker: &DockerService,
         id: i32,
     ) -> AppResult<()> {
-        let txn = db.begin().await.map_err(|e| AppError::System(format!("Failed to begin transaction: {}", e)))?;
+        let txn = db
+            .begin()
+            .await
+            .map_err(|e| AppError::System(format!("Failed to begin transaction: {}", e)))?;
 
         let existing = WebsiteEntity::find_by_id(id)
             .one(&txn)
@@ -515,12 +729,20 @@ impl WebsiteService {
 
         if let Err(e) = ProxyConfigService::undeploy(&existing, app_manager, docker).await {
             txn.rollback().await.ok();
-            return Err(AppError::System(format!("Failed to undeploy proxy configuration: {}", e)));
+            return Err(AppError::System(format!(
+                "Failed to undeploy proxy configuration: {}",
+                e
+            )));
         }
 
-        existing.delete(&txn).await.map_err(|e| AppError::System(format!("Failed to delete website: {}", e)))?;
+        existing
+            .delete(&txn)
+            .await
+            .map_err(|e| AppError::System(format!("Failed to delete website: {}", e)))?;
 
-        txn.commit().await.map_err(|e| AppError::System(format!("Failed to commit transaction: {}", e)))?;
+        txn.commit()
+            .await
+            .map_err(|e| AppError::System(format!("Failed to commit transaction: {}", e)))?;
 
         Ok(())
     }
@@ -631,9 +853,7 @@ impl WebsiteService {
         }
 
         if site_types.contains(&SiteType::Static) {
-            let has_root = root_dir
-                .map(|r| !r.trim().is_empty())
-                .unwrap_or(false);
+            let has_root = root_dir.map(|r| !r.trim().is_empty()).unwrap_or(false);
             if !has_root {
                 return Err(AppError::Validation(
                     "Static site must specify a root directory".to_string(),

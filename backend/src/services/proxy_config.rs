@@ -287,6 +287,22 @@ impl ProxyConfigService {
             );
         }
 
+        // SSL configuration for Nginx/OpenResty templates
+        ctx.insert("has_ssl", &website.has_ssl);
+        if website.has_ssl
+            && matches!(
+                website.server_type,
+                ServerType::Nginx | ServerType::OpenResty
+            )
+        {
+            let (cert_path, key_path) =
+                crate::services::certificate::CertificateService::cert_paths(
+                    &website.primary_domain,
+                );
+            ctx.insert("ssl_cert_path", &cert_path);
+            ctx.insert("ssl_key_path", &key_path);
+        }
+
         tera.render(template_name, &ctx)
             .map_err(|e| AppError::System(format!("Failed to render proxy template: {}", e)))
     }
@@ -442,26 +458,43 @@ impl ProxyConfigService {
 
         match website.server_type {
             ServerType::Nginx | ServerType::OpenResty => {
-                if site_types_vec.contains(&SiteType::Static) {
-                    let compose_file = instance_dir.join("docker-compose.yml");
-                    if compose_file.exists() {
-                        if let Ok(content) = std::fs::read_to_string(&compose_file) {
-                            let static_mount = "/opt/mana-panel/www:/opt/mana-panel/www:ro";
-                            if !content.contains(static_mount) {
-                                tracing::info!(
-                                    "Detected legacy proxy instance '{}' without static mount, triggering automatic application update",
-                                    instance_id
-                                );
-                                app_manager
-                                    .update_application(&instance_id.to_string(), None)
-                                    .await
-                                    .map_err(|e| {
-                                        AppError::System(format!(
-                                            "Proxy instance '{}' is missing static mount '{}', and automatic update failed: {}",
-                                            instance_id, static_mount, e
-                                        ))
-                                    })?;
-                            }
+                let compose_file = instance_dir.join("docker-compose.yml");
+                if compose_file.exists() {
+                    if let Ok(content) = std::fs::read_to_string(&compose_file) {
+                        // Check for missing volume mounts that the latest template provides
+                        let required_mounts: &[&str] = if site_types_vec.contains(&SiteType::Static) {
+                            &[
+                                "/opt/mana-panel/www:/opt/mana-panel/www:ro",
+                                "/opt/mana-panel/certs:/opt/mana-panel/certs:ro",
+                                "/opt/mana-panel/acme-challenge:/opt/mana-panel/acme-challenge:ro",
+                            ]
+                        } else {
+                            &[
+                                "/opt/mana-panel/certs:/opt/mana-panel/certs:ro",
+                                "/opt/mana-panel/acme-challenge:/opt/mana-panel/acme-challenge:ro",
+                            ]
+                        };
+
+                        let missing: Vec<&&str> = required_mounts
+                            .iter()
+                            .filter(|m| !content.contains(**m))
+                            .collect();
+
+                        if !missing.is_empty() {
+                            tracing::info!(
+                                "Detected legacy proxy instance '{}' missing mounts {:?}, triggering automatic application update",
+                                instance_id,
+                                missing
+                            );
+                            app_manager
+                                .update_application(&instance_id.to_string(), None)
+                                .await
+                                .map_err(|e| {
+                                    AppError::System(format!(
+                                        "Proxy instance '{}' is missing required mounts, and automatic update failed: {}",
+                                        instance_id, e
+                                    ))
+                                })?;
                         }
                     }
                 }
